@@ -20,13 +20,18 @@ const runPlagiarismScan = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only instructors or TAs can run plagiarism checks' });
     }
 
-    // Fetch all submissions for questions belonging to homeworks in this classroom
+    // Fetch all submissions for questions belonging to homeworks in this classroom (text submissions only)
     const [submissions] = await db.query(
       `SELECT s.submission_id, s.question_id, s.learner_id, s.code_hash, s.code_content, q.homework_id
        FROM submissions s
        JOIN questions q ON s.question_id = q.question_id
        JOIN homework h ON q.homework_id = h.homework_id
-       WHERE h.classroom_id = ? AND s.code_hash IS NOT NULL AND s.code_hash != ''`,
+       WHERE h.classroom_id = ? 
+         AND s.submission_type = 'text' 
+         AND s.code_hash IS NOT NULL 
+         AND s.code_hash != '' 
+         AND s.code_content IS NOT NULL 
+         AND TRIM(s.code_content) != ''`,
       [classroomId]
     );
 

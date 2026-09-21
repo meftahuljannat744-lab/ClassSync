@@ -68,14 +68,16 @@ const getClassroomAlerts = async (req, res) => {
       LEFT JOIN users res ON la.resolved_by = res.user_id
       WHERE la.classroom_id = ?
     `;
+    const queryParams = [classroomId];
 
     if (!isStaff) {
-      query += ` AND la.learner_id = ${parseInt(userId)}`;
+      query += ` AND la.learner_id = ?`;
+      queryParams.push(userId);
     }
 
     query += ` ORDER BY la.created_at DESC`;
 
-    const [rows] = await db.query(query, [classroomId]);
+    const [rows] = await db.query(query, queryParams);
     res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Error fetching learner alerts:', error);

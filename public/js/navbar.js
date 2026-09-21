@@ -1,7 +1,52 @@
+// Global tracking for session IDs shown/dismissed in this browser tab/session
+const shownSessionIds = new Set();
+
+// Load any previously shown/dismissed session IDs from sessionStorage for this browser tab
+try {
+  const stored = sessionStorage.getItem('classsync_shown_live_sessions');
+  if (stored) {
+    JSON.parse(stored).forEach(id => shownSessionIds.add(Number(id)));
+  }
+} catch (e) {
+  console.warn('Failed to load shown live sessions from sessionStorage:', e);
+}
+
+// Automatically suppress popup if user is currently viewing a live session page
+try {
+  if (window.location.pathname.includes('live.html')) {
+    const activeUrlSessionId = new URLSearchParams(window.location.search).get('id');
+    if (activeUrlSessionId) {
+      shownSessionIds.add(Number(activeUrlSessionId));
+    }
+  }
+} catch (e) {
+  console.warn('Failed to parse URL session ID:', e);
+}
+
+function markSessionAsShown(sessionId) {
+  if (!sessionId) return;
+  const numId = Number(sessionId);
+  shownSessionIds.add(numId);
+  try {
+    sessionStorage.setItem('classsync_shown_live_sessions', JSON.stringify(Array.from(shownSessionIds)));
+  } catch (e) {
+    console.warn('Failed to save shown live sessions to sessionStorage:', e);
+  }
+  console.log(`[LiveSessionPoll] Session ${numId} marked as shown/dismissed. Current shown set:`, Array.from(shownSessionIds));
+}
+
+// Current active session ID associated with the modal
+let currentModalSessionId = null;
+
 // Global Dark Mode Theme Initialization
 (function initTheme() {
   const savedTheme = localStorage.getItem('classsync_theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
+  if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
 })();
 
 // Render shared Navbar across all pages
@@ -11,8 +56,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const currentTheme = localStorage.getItem('classsync_theme') || 'light';
   const token = getAuthToken();
-  const storedUserJson = localStorage.getItem('classsync_user');
-  let loggedInUser = storedUserJson ? JSON.parse(storedUserJson) : null;
+  
+  let loggedInUser = null;
+  try {
+    const storedUserJson = localStorage.getItem('classsync_user');
+    if (storedUserJson && storedUserJson !== 'undefined') {
+      loggedInUser = JSON.parse(storedUserJson);
+    }
+  } catch (e) {
+    console.warn('Failed parsing stored user data:', e);
+  }
 
   navbarContainer.innerHTML = `
     <nav class="navbar">
@@ -25,6 +78,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         </button>
 
         ${token ? `
+          <div id="navbar-live-btn-container" style="display: none; align-items: center;">
+            <a id="navbar-live-btn" href="#" class="btn btn-warning btn-sm pulsing-btn">
+              <i class="fa-solid fa-video fa-beat-fade"></i> Join Live Class
+            </a>
+          </div>
+
           <div class="notification-bell-container">
             <button class="bell-btn" id="bell-btn" title="Notifications">
               <i class="fa-solid fa-bell"></i> <span class="bell-badge" id="bell-badge" style="display:none;">0</span>
@@ -50,11 +109,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="user-switcher">
             <label for="active-user-select"><i class="fa-solid fa-user-gear"></i> Test User:</label>
             <select id="active-user-select">
-              <option value="1">Loading users...</option>
+              <option value="1">User #1</option>
             </select>
           </div>
           <a href="/login.html" class="btn btn-outline btn-sm">Login</a>
-          <a href="/register.html" class="btn btn-primary btn-sm">Register</a>
+          <a href="/register.html" class="btn btn-accent btn-sm">Register</a>
         `}
       </div>
     </nav>
@@ -65,6 +124,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const activeTheme = document.documentElement.getAttribute('data-theme') || 'light';
     const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('classsync_theme', newTheme);
     document.getElementById('theme-toggle-btn').innerHTML = newTheme === 'dark' ? '<i class="fa-solid fa-sun"></i> Light Mode' : '<i class="fa-solid fa-moon"></i> Dark Mode';
   });
@@ -75,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const res = await apiFetch('/users');
       const select = document.getElementById('active-user-select');
-      if (select) {
+      if (select && res.data) {
         select.innerHTML = res.data.map(u => `
           <option value="${u.user_id}" ${u.user_id == currentUserId ? 'selected' : ''}>
             ${u.full_name} (${u.email})
@@ -87,7 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
     } catch (err) {
-      console.error('Navbar user fetch failed:', err);
+      console.warn('Navbar test user fetch bypassed:', err.message);
     }
   } else {
     // Handle Notifications Bell for Logged-In User
@@ -113,12 +177,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         notiList.innerHTML = res.data.map(n => `
-          <div class="noti-item ${n.is_read ? '' : 'unread'}" onclick="markNotiRead(${n.notification_id}, '${n.link_url || '#'}')">
+          <div class="noti-item ${n.is_read ? '' : 'unread'}" data-noti-id="${n.notification_id}" data-link="${n.link_url || ''}">
             <div class="title">${n.title}</div>
             <div>${n.message}</div>
             <div class="time">${new Date(n.created_at).toLocaleString()}</div>
           </div>
         `).join('');
+
+        notiList.querySelectorAll('.noti-item').forEach(item => {
+          item.onclick = (e) => {
+            e.stopPropagation();
+            const id = item.getAttribute('data-noti-id');
+            const linkUrl = item.getAttribute('data-link');
+            markNotiRead(id, linkUrl);
+          };
+        });
       } catch (err) {
         console.error('Failed loading notifications:', err);
       }
@@ -138,29 +211,166 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.stopPropagation();
       });
 
-      markAllBtn.addEventListener('click', async () => {
-        try {
-          await apiFetch('/notifications/mark-all-read', { method: 'POST' });
-          await loadNotifications();
-        } catch (err) {
-          showAlert(err.message, 'error');
-        }
-      });
+      if (markAllBtn) {
+        markAllBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await apiFetch('/notifications/mark-all-read', { method: 'POST' });
+            await loadNotifications();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      }
 
       loadNotifications();
+
+      // Poll for new notifications every 25 seconds
+      setInterval(() => {
+        if (getAuthToken()) {
+          loadNotifications();
+        }
+      }, 25000);
     }
+
+    // Active Live Sessions Global Poller
+    ensureLiveSessionModalExists();
+    pollActiveLiveSessions();
+    setInterval(() => {
+      pollActiveLiveSessions();
+    }, 15000);
   }
 });
 
 async function markNotiRead(id, linkUrl) {
   try {
     await apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
-    if (linkUrl && linkUrl !== '#') {
+    if (linkUrl && linkUrl !== '#' && linkUrl !== '') {
       window.location.href = linkUrl;
     } else {
       window.location.reload();
     }
   } catch (err) {
     console.error(err);
+  }
+}
+
+function ensureLiveSessionModalExists() {
+  if (document.getElementById('live-session-modal-overlay')) return;
+
+  const modalHtml = `
+    <div id="live-session-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
+      <div style="background: var(--card-bg, #ffffff); color: var(--text-main, #0f172a); border-radius: 16px; padding: 2rem; max-width: 450px; width: 100%; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color, #e2e8f0); position: relative; animation: fadeInUp 0.3s ease;">
+        <button id="close-live-modal-x" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1;" title="Close">&times;</button>
+        <div style="font-size: 3rem; color: #f59e0b; margin-bottom: 0.75rem;">
+          <i class="fa-solid fa-circle-dot fa-beat-fade"></i>
+        </div>
+        <h3 id="live-modal-title" style="margin-bottom: 0.5rem; font-family: var(--font-heading); font-size: 1.4rem; color: var(--text-main);">Live Class Started!</h3>
+        <p id="live-modal-message" style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.95rem; line-height: 1.5;">
+          A live class has started.
+        </p>
+        <div style="display: flex; gap: 0.75rem; justify-content: center;">
+          <button id="close-live-modal-btn" class="btn btn-secondary" style="flex: 1;">Dismiss</button>
+          <a id="join-live-modal-btn" href="#" class="btn btn-warning pulsing-btn" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+            <i class="fa-solid fa-video"></i> Join Now
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const overlay = document.getElementById('live-session-modal-overlay');
+  const closeX = document.getElementById('close-live-modal-x');
+  const closeBtn = document.getElementById('close-live-modal-btn');
+  const joinBtn = document.getElementById('join-live-modal-btn');
+
+  const closeModal = () => {
+    if (currentModalSessionId) {
+      markSessionAsShown(currentModalSessionId);
+    }
+    overlay.style.display = 'none';
+  };
+
+  if (closeX) closeX.addEventListener('click', closeModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (joinBtn) {
+    joinBtn.addEventListener('click', () => {
+      if (currentModalSessionId) {
+        markSessionAsShown(currentModalSessionId);
+      }
+      overlay.style.display = 'none';
+    });
+  }
+}
+
+async function pollActiveLiveSessions() {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    const res = await apiFetch('/users/me/active-live-sessions');
+    const activeSessions = res.data || [];
+
+    console.log('[LiveSessionPoll] Checking active sessions. Count:', activeSessions.length, 'Already shown IDs:', Array.from(shownSessionIds));
+
+    const liveBtnContainer = document.getElementById('navbar-live-btn-container');
+    const navbarLiveBtn = document.getElementById('navbar-live-btn');
+
+    if (activeSessions.length > 0) {
+      const latestSession = activeSessions[0];
+
+      if (liveBtnContainer && navbarLiveBtn) {
+        liveBtnContainer.style.display = 'inline-flex';
+        navbarLiveBtn.href = `/live.html?id=${latestSession.session_id}`;
+        navbarLiveBtn.title = `Live: ${latestSession.classroom_name} - ${latestSession.session_title}`;
+      }
+
+      let sessionToAnnounce = null;
+      for (const s of activeSessions) {
+        const sId = Number(s.session_id);
+        if (!shownSessionIds.has(sId)) {
+          if (!sessionToAnnounce) {
+            sessionToAnnounce = s;
+          }
+          markSessionAsShown(sId);
+        } else {
+          console.log(`[LiveSessionPoll] Session ${sId} is already in shownSessionIds set. Skipping popup modal.`);
+        }
+      }
+
+      if (sessionToAnnounce) {
+        console.log(`[LiveSessionPoll] Triggering popup modal for session ${sessionToAnnounce.session_id} (${sessionToAnnounce.session_title})`);
+        showLiveSessionPopup(sessionToAnnounce);
+      }
+    } else {
+      if (liveBtnContainer) {
+        liveBtnContainer.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.warn('Active live session check bypassed:', err.message);
+  }
+}
+
+
+function showLiveSessionPopup(session) {
+  currentModalSessionId = Number(session.session_id);
+  ensureLiveSessionModalExists();
+
+  const overlay = document.getElementById('live-session-modal-overlay');
+  const msgEl = document.getElementById('live-modal-message');
+  const joinBtn = document.getElementById('join-live-modal-btn');
+
+  const sanitize = (typeof escapeHtml === 'function') ? escapeHtml : (str => str);
+
+  if (msgEl) {
+    msgEl.innerHTML = `<strong>${sanitize(session.classroom_name)}</strong> has started a live class:<br/><strong style="color: var(--primary-color);">${sanitize(session.session_title)}</strong>`;
+  }
+  if (joinBtn) {
+    joinBtn.href = `/live.html?id=${session.session_id}`;
+  }
+  if (overlay) {
+    overlay.style.display = 'flex';
   }
 }

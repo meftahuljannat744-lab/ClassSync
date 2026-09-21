@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const form = document.getElementById('reset-form');
   const btn = document.getElementById('reset-btn');
+  const errorBox = document.getElementById('reset-error');
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -15,19 +16,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const otpCode = document.getElementById('reset-otp').value.trim();
     const newPassword = document.getElementById('reset-new-password').value;
 
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+
     if (!targetEmail) {
-      showAlert('Email address missing. Please request reset again.', 'error');
-      window.location.href = '/forgot-password.html';
+      errorBox.textContent = 'Email address missing. Please request a password reset again.';
+      errorBox.style.display = 'block';
+      setTimeout(() => window.location.href = '/forgot-password.html', 1500);
       return;
     }
 
     if (!otpCode || !newPassword) {
-      showAlert('Please enter the 6-digit OTP code and new password.', 'error');
+      errorBox.textContent = 'Please enter both the 6-digit reset code and your new password.';
+      errorBox.style.display = 'block';
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'Updating Password...';
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Resetting Password...`;
 
     try {
       const res = await apiFetch('/auth/reset-password', {
@@ -35,12 +41,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ email: targetEmail, otp_code: otpCode, new_password: newPassword })
       });
 
-      showAlert(res.message);
-      window.location.href = '/login.html';
+      showToast(res.message, 'success');
+      setTimeout(() => {
+        window.location.href = '/login.html';
+      }, 500);
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      showToast(err.message, 'error');
       btn.disabled = false;
-      btn.textContent = 'Reset Password';
+      btn.innerHTML = `<i class="fa-solid fa-check"></i> Reset Password & Sign In`;
     }
   };
 });

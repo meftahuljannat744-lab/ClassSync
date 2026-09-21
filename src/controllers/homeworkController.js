@@ -150,7 +150,7 @@ const getHomeworkById = async (req, res) => {
     // Fetch questions
     const [questions] = await db.query(
       `SELECT q.*, 
-              s.submission_id, s.submitted_at, s.is_late, s.penalty_applied, s.code_content, s.file_url,
+              s.submission_id, s.submission_type, s.submitted_at, s.is_late, s.penalty_applied, s.code_content, s.file_url,
               g.grade_id, g.score, g.feedback, g.is_draft, g.graded_at
        FROM questions q
        LEFT JOIN submissions s ON q.question_id = s.question_id AND s.learner_id = ?
@@ -160,10 +160,17 @@ const getHomeworkById = async (req, res) => {
       [userId, homeworkId]
     );
 
+    const [roleRow] = await db.query(
+      `SELECT role FROM classroom_members WHERE user_id = ? AND classroom_id = ? AND is_active = true`,
+      [userId, homework.classroom_id]
+    );
+    const userRole = roleRow.length > 0 ? roleRow[0].role : null;
+
     res.json({
       success: true,
       data: {
         ...homework,
+        user_role: userRole,
         is_staff: isStaff,
         questions
       }

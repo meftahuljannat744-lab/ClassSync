@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('register-form');
   const btn = document.getElementById('reg-btn');
+  const errorBox = document.getElementById('register-error');
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -9,13 +10,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
 
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+
     if (!fullName || !email || !password) {
-      showAlert('Please fill in all required fields.', 'error');
+      errorBox.textContent = 'Please fill in all required fields to register.';
+      errorBox.style.display = 'block';
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'Sending OTP...';
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sending OTP...`;
 
     try {
       const res = await apiFetch('/auth/register', {
@@ -23,12 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ full_name: fullName, email, password })
       });
 
-      showAlert(res.message);
-      window.location.href = `/verify-otp.html?email=${encodeURIComponent(email)}`;
+      showToast(res.message, 'success');
+      setTimeout(() => {
+        window.location.href = `/verify-otp.html?email=${encodeURIComponent(email)}`;
+      }, 500);
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      showToast(err.message, 'error');
       btn.disabled = false;
-      btn.textContent = 'Send Verification OTP';
+      btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send Verification OTP`;
     }
   };
 });

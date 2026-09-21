@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sessionId = urlParams.get('id');
 
   if (!sessionId) {
-    alert('No live session ID specified!');
+    showToast('No live session ID specified!', 'error');
     window.location.href = '/index.html';
     return;
   }
@@ -19,23 +19,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       document.getElementById('session-title-header').textContent = sessionData.session_title;
       document.getElementById('session-meta').innerHTML = `
-        Classroom: <strong>${sessionData.classroom_name}</strong> | 
-        Scheduled: ${new Date(sessionData.scheduled_time).toLocaleString()} | 
-        Expected Duration: ${sessionData.expected_duration} mins (Attendance Threshold: 75%)
+        Classroom: <strong class="text-slate-800 dark:text-slate-200">${sessionData.classroom_name}</strong> &nbsp;|&nbsp; 
+        Scheduled: ${new Date(sessionData.scheduled_time).toLocaleString()} &nbsp;|&nbsp; 
+        Expected Duration: ${sessionData.expected_duration} mins (75% Attendance Threshold)
       `;
       document.getElementById('back-to-classroom-btn').href = `/classroom.html?id=${sessionData.classroom_id}`;
-      document.getElementById('jitsi-room-name-tag').textContent = `Room: ${sessionData.jitsi_room_id}`;
+      document.getElementById('jitsi-room-name-tag').textContent = `Room ID: ${sessionData.jitsi_room_id}`;
 
       // Set Jitsi Iframe URL
-      const jitsiUrl = `https://meet.jit.si/${encodeURIComponent(sessionData.jitsi_room_id)}#userInfo.displayName="${encodeURIComponent('ClassSync Student')}"`;
+      const jitsiUrl = `https://meet.jit.si/${encodeURIComponent(sessionData.jitsi_room_id)}#userInfo.displayName="${encodeURIComponent('ClassSync Learner')}"`;
       document.getElementById('jitsi-frame').src = jitsiUrl;
 
       renderAttendanceLog(sessionData.attendance);
-
-      // Start duration heartbeat interval (every 10 seconds, adds +1 minute duration for demo testing)
       startAttendanceTracker();
     } catch (err) {
-      alert(`Error loading live session: ${err.message}`);
+      showToast(`Error loading live session: ${err.message}`, 'error');
     }
   };
 
@@ -48,7 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const secs = elapsedSeconds % 60;
       document.getElementById('tracker-timer').textContent = `${mins} mins ${secs} secs`;
 
-      // Every 10 seconds, report attendance duration heartbeat
       const simulatedDuration = Math.max(1, Math.ceil(elapsedSeconds / 5));
 
       try {
@@ -61,12 +58,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const statusBadge = document.getElementById('attendance-status-badge');
 
         if (is_present) {
-          statusBadge.innerHTML = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> PRESENT (Reached ${threshold_minutes} min threshold!)</span>`;
+          statusBadge.innerHTML = `<span class="badge badge-green"><i class="fa-solid fa-check-circle"></i> PRESENT (${threshold_minutes} min threshold met!)</span>`;
         } else {
-          statusBadge.innerHTML = `<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> TRACKING (${simulatedDuration}/${threshold_minutes} mins to reach 75%)</span>`;
+          statusBadge.innerHTML = `<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> TRACKING (${simulatedDuration}/${threshold_minutes} mins for 75%)</span>`;
         }
 
-        // Refresh log table
         const refreshRes = await apiFetch(`/live-sessions/${sessionId}`);
         renderAttendanceLog(refreshRes.data.attendance);
       } catch (err) {
@@ -79,52 +75,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     const tableContainer = document.getElementById('attendance-log-table');
 
     if (!attendanceList || attendanceList.length === 0) {
-      tableContainer.innerHTML = '<p class="card-subtitle">No attendance records logged yet.</p>';
+      tableContainer.innerHTML = renderEmptyState({
+        icon: 'clipboard-user',
+        title: 'No Attendance Recorded',
+        message: 'No learner attendance records logged for this session yet.'
+      });
       return;
     }
 
+    const isStaff = sessionData.is_staff;
+
     tableContainer.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Learner</th>
-            <th>Logged Duration</th>
-            <th>Auto Attendance Status</th>
-            <th>Instructor Override</th>
-            ${sessionData.is_staff ? '<th>Action</th>' : ''}
-          </tr>
-        </thead>
-        <tbody>
-          ${attendanceList.map(a => `
+      <div class="table-responsive">
+        <table>
+          <thead>
             <tr>
-              <td><strong>${a.learner_name}</strong> (${a.learner_email})</td>
-              <td>${a.duration_minutes || 0} minutes</td>
-              <td>
-                ${a.is_present ? '<span class="badge badge-green">PRESENT (≥ 75%)</span>' : '<span class="badge badge-yellow">ABSENT (< 75%)</span>'}
-              </td>
-              <td>
-                ${a.instructor_override ? `
-                  <span class="badge ${a.override_present ? 'badge-green' : 'badge-red'}">
-                    OVERRIDDEN (${a.override_present ? 'Present' : 'Absent'})
-                  </span>
-                  <br><small>${a.override_reason || ''}</small>
-                ` : '<em>None</em>'}
-              </td>
-              ${sessionData.is_staff ? `
-                <td>
-                  <button class="btn btn-outline btn-sm" onclick="overrideAttendanceItem(${a.attendance_id}, true)">Mark Present</button>
-                  <button class="btn btn-outline btn-sm" onclick="overrideAttendanceItem(${a.attendance_id}, false)">Mark Absent</button>
-                </td>
-              ` : ''}
+              <th>Learner Name</th>
+              <th>Logged Duration</th>
+              <th>Auto Attendance</th>
+              <th>Instructor Override</th>
+              ${isStaff ? '<th>Action</th>' : ''}
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${attendanceList.map(a => `
+              <tr>
+                <td>
+                  <div style="font-weight: 700;">${a.learner_name}</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">${a.learner_email}</div>
+                </td>
+                <td style="font-weight: 600;">${a.duration_minutes || 0} Minutes</td>
+                <td>
+                  ${a.is_present ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> PRESENT (&ge; 75%)</span>' : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> ABSENT (&lt; 75%)</span>'}
+                </td>
+                <td>
+                  ${a.instructor_override ? `
+                    <span class="badge ${a.override_present ? 'badge-green' : 'badge-red'}">
+                      OVERRIDDEN (${a.override_present ? 'Present' : 'Absent'})
+                    </span>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">${a.override_reason || ''}</div>
+                  ` : '<span style="color: var(--text-muted);">None</span>'}
+                </td>
+                ${isStaff ? `
+                  <td style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" onclick="overrideAttendanceItem(${a.attendance_id}, true)">
+                      <i class="fa-solid fa-user-check" style="color: var(--status-green);"></i> Mark Present
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="overrideAttendanceItem(${a.attendance_id}, false)">
+                      <i class="fa-solid fa-user-xmark" style="color: var(--status-red);"></i> Mark Absent
+                    </button>
+                  </td>
+                ` : ''}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   };
 
   window.overrideAttendanceItem = async (attendanceId, present) => {
-    const reason = prompt(`Enter reason for manual attendance override to ${present ? 'PRESENT' : 'ABSENT'}:`, 'Instructor verification');
+    const reason = prompt(`Reason for attendance override to ${present ? 'PRESENT' : 'ABSENT'}:`, 'Instructor verification');
     if (reason === null) return;
 
     try {
@@ -137,9 +148,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       const res = await apiFetch(`/live-sessions/${sessionId}`);
       renderAttendanceLog(res.data.attendance);
-      showAlert('Attendance override saved!');
+      showToast(`Attendance marked as ${present ? 'PRESENT' : 'ABSENT'}`, 'success');
     } catch (err) {
-      showAlert(err.message, 'error');
+      showToast(err.message, 'error');
     }
   };
 

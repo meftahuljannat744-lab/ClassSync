@@ -28,4 +28,36 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsers, getMe };
+// GET /api/users/me/submission-heatmap - 90-day daily submission counts for current user (optional ?homework_id=X)
+const getSubmissionHeatmap = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { homework_id } = req.query;
+
+    let sql = `
+      SELECT DATE_FORMAT(s.submitted_at, '%Y-%m-%d') AS date, COUNT(*) AS count
+      FROM submissions s
+    `;
+    const params = [];
+
+    if (homework_id) {
+      sql += ` JOIN questions q ON s.question_id = q.question_id WHERE s.learner_id = ? AND q.homework_id = ? AND s.submitted_at >= NOW() - INTERVAL 90 DAY`;
+      params.push(userId, homework_id);
+    } else {
+      sql += ` WHERE s.learner_id = ? AND s.submitted_at >= NOW() - INTERVAL 90 DAY`;
+      params.push(userId);
+    }
+
+    sql += ` GROUP BY DATE(s.submitted_at) ORDER BY date ASC`;
+
+    const [rows] = await db.query(sql, params);
+
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching submission heatmap:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getAllUsers, getMe, getSubmissionHeatmap };
+

@@ -134,8 +134,69 @@ const getCodeReviews = async (req, res) => {
   }
 };
 
+// GET /api/classrooms/:id/gradings - Consolidated submissions view across all homeworks in classroom
+const getConsolidatedGradings = async (req, res) => {
+  try {
+    const classroomId = req.params.id;
+    const { filter, sort } = req.query;
+
+    let sql = `
+      SELECT 
+        s.submission_id,
+        q.homework_id,
+        h.title AS homework_title,
+        s.question_id,
+        q.question_text AS question_title,
+        q.points AS max_score,
+        s.learner_id,
+        u.full_name AS learner_name,
+        u.email AS learner_email,
+        s.submitted_at,
+        s.is_late,
+        s.submission_type,
+        g.score,
+        g.is_draft,
+        CASE WHEN g.grade_id IS NOT NULL THEN true ELSE false END AS is_graded
+      FROM submissions s
+      JOIN questions q ON s.question_id = q.question_id
+      JOIN homework h ON q.homework_id = h.homework_id
+      JOIN users u ON s.learner_id = u.user_id
+      LEFT JOIN grades g ON s.submission_id = g.submission_id
+      WHERE h.classroom_id = ?
+    `;
+
+    const params = [classroomId];
+
+    if (filter === 'graded') {
+      sql += ` AND g.grade_id IS NOT NULL`;
+    } else if (filter === 'ungraded') {
+      sql += ` AND g.grade_id IS NULL`;
+    }
+
+    if (sort === 'learner') {
+      sql += ` ORDER BY u.full_name ASC, s.submitted_at DESC`;
+    } else if (sort === 'homework') {
+      sql += ` ORDER BY h.title ASC, s.submitted_at DESC`;
+    } else {
+      sql += ` ORDER BY s.submitted_at DESC`;
+    }
+
+    const [submissions] = await db.query(sql, params);
+
+    res.json({
+      success: true,
+      data: submissions
+    });
+  } catch (error) {
+    console.error('Error fetching consolidated gradings:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   gradeSubmission,
   addCodeReview,
-  getCodeReviews
+  getCodeReviews,
+  getConsolidatedGradings
 };
+

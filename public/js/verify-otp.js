@@ -8,25 +8,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const form = document.getElementById('otp-form');
   const btn = document.getElementById('otp-btn');
+  const errorBox = document.getElementById('otp-error');
 
   form.onsubmit = async (e) => {
     e.preventDefault();
 
     const otpCode = document.getElementById('otp-code').value.trim();
 
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+
     if (!targetEmail) {
-      showAlert('Email address missing. Please register again.', 'error');
-      window.location.href = '/register.html';
+      errorBox.textContent = 'Email address missing. Please complete registration first.';
+      errorBox.style.display = 'block';
+      setTimeout(() => window.location.href = '/register.html', 1500);
       return;
     }
 
     if (!otpCode || otpCode.length !== 6) {
-      showAlert('Please enter a valid 6-digit OTP code.', 'error');
+      errorBox.textContent = 'Please enter a valid 6-digit verification code.';
+      errorBox.style.display = 'block';
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'Verifying...';
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Code...`;
 
     try {
       const res = await apiFetch('/auth/verify-otp', {
@@ -34,16 +40,19 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ email: targetEmail, otp_code: otpCode })
       });
 
-      // Save JWT Token and User
       localStorage.setItem('classsync_token', res.token);
       localStorage.setItem('classsync_user', JSON.stringify(res.user));
 
-      showAlert('Account verified and logged in successfully!');
-      window.location.href = '/index.html';
+      showToast('Account verified successfully!', 'success');
+      setTimeout(() => {
+        window.location.href = '/index.html';
+      }, 500);
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      showToast(err.message, 'error');
       btn.disabled = false;
-      btn.textContent = 'Verify OTP & Create Account';
+      btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Verify OTP & Activate Account`;
     }
   };
 });

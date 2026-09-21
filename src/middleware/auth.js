@@ -49,4 +49,42 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken };
+const optionalToken = async (req, res, next) => {
+  try {
+    let token = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    }
+    const mockUserId = req.headers['x-user-id'] || req.query.mock_user_id;
+
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.user_id;
+      } catch (err) {
+        // Ignore token errors for optional auth
+      }
+    } else if (mockUserId) {
+      userId = parseInt(mockUserId, 10);
+    }
+
+    if (userId) {
+      const [rows] = await db.query(
+        'SELECT user_id, email, full_name, profile_picture_url FROM users WHERE user_id = ? AND is_active = true',
+        [userId]
+      );
+      if (rows.length > 0) {
+        req.user = rows[0];
+      }
+    }
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
+module.exports = { verifyToken, optionalToken };
+

@@ -3,70 +3,109 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Homework & Submission - ClassSync</title>
+  <title>Homework Set & Grading - ClassSync</title>
+  <meta name="description" content="Submit solutions, view instructor feedback, inspect answer keys, and manage homework questions in ClassSync.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="container">
-    <div class="page-header">
+  <main class="container">
+    <div class="page-header" style="padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
       <div>
         <h1 class="page-title" id="hw-title">Homework Details</h1>
-        <p class="card-subtitle" id="hw-meta">Loading homework details...</p>
+        <p class="card-subtitle" id="hw-meta" style="margin: 0.35rem 0 0 0;">Loading homework details...</p>
       </div>
-      <div style="display:flex; gap:0.5rem;">
-        <a href="#" id="back-to-classroom-btn" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> Back to Classroom</a>
-        <button class="btn btn-primary staff-only" id="open-add-q-btn" style="display:none;"><i class="fa-solid fa-plus"></i> Add Question</button>
+      <div style="display: flex; gap: 0.75rem;">
+        <a href="#" id="back-to-classroom-btn" class="btn btn-outline btn-sm">
+          <i class="fa-solid fa-arrow-left"></i> Back to Classroom
+        </a>
+        <button class="btn btn-primary instructor-only" id="open-add-q-btn" style="display: none;">
+          <i class="fa-solid fa-plus"></i> Add Question
+        </button>
       </div>
     </div>
 
     <!-- Questions Container -->
-    <div id="questions-container">
-      <p>Loading questions...</p>
+    <div id="questions-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <!-- Render Questions -->
     </div>
-  </div>
+  </main>
 
-  <!-- Add Question Modal (Instructor/TA) -->
+  <!-- Add Question Modal (Instructor) -->
   <div class="modal" id="add-q-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add Question to Homework</h3>
+        <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-circle-question" style="color: var(--primary-color);"></i> Add Question to Homework
+        </h3>
         <button class="modal-close" id="close-add-q-modal">&times;</button>
       </div>
       <form id="add-q-form">
+        <div id="add-q-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+
         <div class="form-group">
-          <label>Question Type *</label>
+          <label for="q-type">Question Type *</label>
           <select id="q-type" class="form-control">
-            <option value="text">Code / SQL / Text</option>
-            <option value="link">URL / Web Link</option>
-            <option value="pdf">PDF File URL</option>
+            <option value="text">📄 Code / SQL / Text Solution</option>
+            <option value="pdf">📕 PDF Attachment (.pdf)</option>
+            <option value="pptx">📊 PPTX Presentation (.pptx)</option>
+            <option value="docx">📘 DOCX Document (.docx)</option>
+            <option value="link">🌐 Web Link Reference</option>
           </select>
         </div>
+
         <div class="form-group">
-          <label>Question Prompt / Text *</label>
-          <textarea id="q-text" class="form-control" required></textarea>
+          <label for="q-text">Question Prompt / Statement *</label>
+          <textarea id="q-text" class="form-control" style="height: 85px;" placeholder="Type question description or paste text/code..." required></textarea>
+          
+          <div class="file-dropzone" id="q-dropzone" onclick="document.getElementById('q-file-picker').click()">
+            <i class="fa-solid fa-cloud-arrow-up file-dropzone-icon"></i>
+            <div class="file-dropzone-text">Drag & Drop Question File (PDF, PPTX, DOCX, Code, Text)</div>
+            <div class="file-dropzone-hint">Or click here to choose file</div>
+            <input type="file" id="q-file-picker" style="display:none;" accept=".pdf,.pptx,.docx,.txt,.zip,.py,.java,.cpp,.c,.sql,.js">
+            <input type="hidden" id="q-file-url" value="">
+            <div id="q-file-status" style="margin-top: 0.25rem;"></div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Points *</label>
-          <input type="number" id="q-points" class="form-control" value="10" required>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="q-points">Points *</label>
+            <input type="number" id="q-points" class="form-control" value="10" required>
+          </div>
+          <div class="form-group">
+            <label for="q-order">Question Order #</label>
+            <input type="number" id="q-order" class="form-control" value="1">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Order Number</label>
-          <input type="number" id="q-order" class="form-control" value="1">
+
+        <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+          <h4 style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--primary-color); margin-bottom: 0.5rem;">Instructor Answer Key (Optional)</h4>
+          <div class="form-group">
+            <label for="q-ans-text">Official Solution Text / Code</label>
+            <textarea id="q-ans-text" class="form-control" style="height: 70px;" placeholder="Unlocked for learners only AFTER submitting their solution"></textarea>
+            
+            <div class="file-dropzone" id="q-ans-dropzone" onclick="document.getElementById('q-ans-file-picker').click()">
+              <i class="fa-solid fa-cloud-arrow-up file-dropzone-icon"></i>
+              <div class="file-dropzone-text">Drag & Drop Official Answer File (PDF, PPTX, DOCX, Code, Text)</div>
+              <div class="file-dropzone-hint">Or click here to choose file</div>
+              <input type="file" id="q-ans-file-picker" style="display:none;" accept=".pdf,.pptx,.docx,.txt,.zip,.py,.java,.cpp,.c,.sql,.js">
+              <input type="hidden" id="q-ans-file-url" value="">
+              <div id="q-ans-file-status" style="margin-top: 0.25rem;"></div>
+            </div>
+          </div>
         </div>
-        <hr style="margin: 1rem 0; border-color: var(--border-color);">
-        <h4>Instructor Answer Key (Optional)</h4>
-        <div class="form-group">
-          <label>Solution / Answer Text</label>
-          <textarea id="q-ans-text" class="form-control" placeholder="Visible to learners only after their submission"></textarea>
-        </div>
-        <div style="text-align: right; margin-top: 1rem;">
-          <button type="submit" class="btn btn-primary">Add Question</button>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; position: sticky; bottom: 0; background: var(--card-bg); padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-outline" id="cancel-add-q-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submit-add-q-btn">
+            <i class="fa-solid fa-check"></i> Add Question
+          </button>
         </div>
       </form>
     </div>
@@ -74,48 +113,58 @@
 
   <!-- Grade & Inline Review Modal (Instructor/TA) -->
   <div class="modal" id="grade-modal">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content" style="max-width: 640px;">
       <div class="modal-header">
-        <h3>Grade & Review Submission</h3>
+        <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-pen-ruler" style="color: var(--primary-color);"></i> Grade & Review Submission
+        </h3>
         <button class="modal-close" id="close-grade-modal">&times;</button>
       </div>
       <div>
-        <div class="card-subtitle" id="grade-learner-info">Learner Submission</div>
-        <div class="code-box" id="grade-code-view">No code content</div>
+        <div class="card-subtitle" id="grade-learner-info" style="margin-bottom: 0.5rem;">Learner Submission</div>
+        <div class="code-box" style="max-height: 240px; overflow-y: auto;" id="grade-code-view">No content</div>
 
-        <!-- Existing Inline Comments -->
+        <!-- Line Comments -->
         <div style="margin-bottom: 1rem;">
-          <h4>Inline Line Reviews</h4>
+          <h4 style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-main); margin-bottom: 0.5rem;">Inline Line Reviews</h4>
           <div id="inline-reviews-list">No line comments yet.</div>
         </div>
 
         <!-- Add Inline Comment Form -->
-        <form id="add-review-form" style="background:var(--table-head-bg); padding:0.75rem; border-radius:6px; margin-bottom:1rem; border:1px solid var(--border-color);">
-          <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-            <input type="number" id="rev-line-start" class="form-control" placeholder="Start Line #" required style="width:120px;">
-            <input type="number" id="rev-line-end" class="form-control" placeholder="End Line #" required style="width:120px;">
+        <form id="add-review-form" class="card" style="padding: 1rem; margin-bottom: 1rem; background-color: var(--table-head-bg);">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="number" id="rev-line-start" class="form-control" style="width: 110px; font-size: 0.8rem;" placeholder="Start Line #" required>
+            <input type="number" id="rev-line-end" class="form-control" style="width: 110px; font-size: 0.8rem;" placeholder="End Line #" required>
           </div>
-          <input type="text" id="rev-comment" class="form-control" placeholder="Line review comment..." required>
-          <button type="submit" class="btn btn-outline btn-sm" style="margin-top:0.5rem;"><i class="fa-solid fa-comment-medical"></i> Add Line Review</button>
+          <input type="text" id="rev-comment" class="form-control" style="font-size: 0.8rem; margin-bottom: 0.5rem;" placeholder="Add specific line review feedback..." required>
+          <button type="submit" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-comment-medical"></i> Add Line Review Comment
+          </button>
         </form>
 
-        <hr style="margin:1rem 0; border-color:var(--border-color);">
+        <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border-color);">
 
         <!-- Main Grade Form -->
         <form id="submit-grade-form">
+          <div id="grade-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+
           <div class="form-group">
-            <label>Score (Points)</label>
+            <label for="grade-score">Score (Points) *</label>
             <input type="number" step="0.5" id="grade-score" class="form-control" required>
           </div>
           <div class="form-group">
-            <label>Feedback</label>
-            <textarea id="grade-feedback" class="form-control"></textarea>
+            <label for="grade-feedback">Overall Feedback</label>
+            <textarea id="grade-feedback" class="form-control" style="height: 80px;" placeholder="Provide helpful feedback..."></textarea>
           </div>
-          <div class="form-group">
-            <label><input type="checkbox" id="grade-draft"> Save as Draft (don't notify learner)</label>
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="grade-draft">
+            <label for="grade-draft" style="margin-bottom: 0; font-size: 0.8rem;">Save as Draft (don't notify learner yet)</label>
           </div>
-          <div style="text-align: right;">
-            <button type="submit" class="btn btn-primary">Save & Post Grade</button>
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="button" class="btn btn-outline" id="cancel-grade-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="submit-grade-btn">
+              <i class="fa-solid fa-check"></i> Save & Post Grade
+            </button>
           </div>
         </form>
       </div>

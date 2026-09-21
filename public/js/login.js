@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('login-form');
   const btn = document.getElementById('login-btn');
+  const errorBox = document.getElementById('login-error');
 
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -8,13 +9,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+
     if (!email || !password) {
-      showAlert('Please enter email and password.', 'error');
+      errorBox.textContent = 'Please enter both your email address and password.';
+      errorBox.style.display = 'block';
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'Logging in...';
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Logging in...`;
 
     try {
       const res = await apiFetch('/auth/login', {
@@ -22,16 +27,20 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ email, password })
       });
 
-      // Save JWT Token and User
       localStorage.setItem('classsync_token', res.token);
       localStorage.setItem('classsync_user', JSON.stringify(res.user));
+      localStorage.setItem('classsync_user_id', res.user.user_id);
 
-      showAlert('Login successful!');
-      window.location.href = '/index.html';
+      showToast('Login successful! Redirecting...', 'success');
+      setTimeout(() => {
+        window.location.href = '/index.html';
+      }, 500);
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      showToast(err.message, 'error');
       btn.disabled = false;
-      btn.textContent = 'Log In';
+      btn.innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket"></i> Log In to ClassSync`;
     }
   };
 });

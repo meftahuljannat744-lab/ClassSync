@@ -81,7 +81,7 @@ CREATE TABLE `homework` (
 CREATE TABLE `questions` (
   `question_id` int PRIMARY KEY AUTO_INCREMENT,
   `homework_id` int NOT NULL,
-  `question_type` enum('link','text','pdf') NOT NULL DEFAULT 'text',
+  `question_type` enum('link','text','pdf','docx','pptx') NOT NULL DEFAULT 'text',
   `question_text` text NOT NULL,
   `question_data` text,
   `points` int DEFAULT 10,
@@ -94,6 +94,7 @@ CREATE TABLE `submissions` (
   `submission_id` int PRIMARY KEY AUTO_INCREMENT,
   `question_id` int NOT NULL,
   `learner_id` int NOT NULL,
+  `submission_type` enum('text','link','pdf','docx','pptx') NOT NULL DEFAULT 'text',
   `code_hash` varchar(255) NOT NULL,
   `code_content` text,
   `file_url` varchar(500),
@@ -289,15 +290,65 @@ ALTER TABLE `learner_alerts` ADD FOREIGN KEY (`resolved_by`) REFERENCES `users` 
 ALTER TABLE `plagiarism_flags` ADD FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`);
 ALTER TABLE `plagiarism_flags` ADD CONSTRAINT `chk_submission_order` CHECK (`submission_id_1` < `submission_id_2`);
 
--- ==============================================================================
--- MIGRATIONS & NEW FEATURE EXTENSIONS (Added incrementally for Auth module)
--- ==============================================================================
 
--- 1. Add verification status column to users table
 ALTER TABLE `users` ADD COLUMN `is_verified` BOOLEAN DEFAULT false;
 
--- 2. Add OTP purpose column to password_reset_otp table
 ALTER TABLE `password_reset_otp` ADD COLUMN `otp_purpose` ENUM('registration','password_reset') NOT NULL DEFAULT 'password_reset';
 
--- 3. Allow NULL user_id for registration OTPs before account creation
 ALTER TABLE `password_reset_otp` MODIFY COLUMN `user_id` INT NULL;
+
+ALTER TABLE `homework` ADD COLUMN `deadline_reminder_sent` BOOLEAN DEFAULT false;
+
+-- Part 1: Course Visibility, Monetization & Enrollment Requests Migration
+ALTER TABLE `users` ADD COLUMN `phone_number` VARCHAR(20) NULL;
+
+ALTER TABLE `classrooms` ADD COLUMN `visibility` ENUM('public','private') NOT NULL DEFAULT 'private';
+ALTER TABLE `classrooms` ADD COLUMN `is_paid` BOOLEAN DEFAULT false;
+ALTER TABLE `classrooms` ADD COLUMN `price` DECIMAL(10,2) NULL;
+ALTER TABLE `classrooms` ADD COLUMN `cover_photo_url` VARCHAR(500) NULL;
+
+CREATE TABLE IF NOT EXISTS `enrollment_requests` (
+  `request_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `payment_method` varchar(50),
+  `payer_phone_number` varchar(20),
+  `transaction_id` varchar(100),
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `requested_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `reviewed_by` int NULL,
+  `reviewed_at` timestamp NULL,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
+);
+
+-- Migration Part 2: Extended Attachment & File Types (text, link, pdf, pptx, docx)
+ALTER TABLE `resources` ADD COLUMN `resource_type` VARCHAR(50) NOT NULL DEFAULT 'link';
+ALTER TABLE `questions` MODIFY COLUMN `question_type` VARCHAR(50) NOT NULL DEFAULT 'text';
+
+-- Migration Part 3: Group Chat & Direct Messaging System
+CREATE TABLE IF NOT EXISTS `classroom_messages` (
+  `message_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `sender_id` int NOT NULL,
+  `message_text` text NOT NULL,
+  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
+  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`)
+);
+
+CREATE TABLE IF NOT EXISTS `direct_messages` (
+  `message_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `sender_id` int NOT NULL,
+  `recipient_id` int NOT NULL,
+  `message_text` text NOT NULL,
+  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `is_read` boolean DEFAULT false,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
+  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`),
+  FOREIGN KEY (`recipient_id`) REFERENCES `users`(`user_id`)
+);-- Migration Part 4: Configurable Attendance Threshold
+ALTER TABLE `classrooms` ADD COLUMN `attendance_threshold_percent` INT DEFAULT 75;
+

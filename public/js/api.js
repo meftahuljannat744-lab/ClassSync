@@ -1,12 +1,27 @@
-// ClassSync API Helper Utility
+// ClassSync API Helper Utility & Shared Component Framework
 
 const API_BASE = '/api';
+
+// Utility: HTML Escaping for XSS Prevention & DOM rendering
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
 
 function getAuthToken() {
   return localStorage.getItem('classsync_token');
 }
 
 function getActiveUserId() {
+  try {
+    const storedUserJson = localStorage.getItem('classsync_user');
+    if (storedUserJson && storedUserJson !== 'undefined') {
+      const u = JSON.parse(storedUserJson);
+      if (u && u.user_id) return u.user_id;
+    }
+  } catch (e) {}
   return localStorage.getItem('classsync_user_id') || '1';
 }
 
@@ -31,7 +46,6 @@ async function apiFetch(endpoint, options = {}) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   } else {
-    // Fallback for mock user selection
     headers['x-user-id'] = getActiveUserId();
   }
 
@@ -44,7 +58,6 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     if (response.status === 401 && !endpoint.startsWith('/auth/')) {
-      // Token expired or unauthenticated
       localStorage.removeItem('classsync_token');
     }
     throw new Error(data.message || 'An error occurred while processing request');
@@ -53,7 +66,167 @@ async function apiFetch(endpoint, options = {}) {
   return data;
 }
 
-// Global alert utility
-function showAlert(message, type = 'success') {
-  alert(`${type.toUpperCase()}: ${message}`);
+// Toast Notification System
+function showToast(message, type = 'success') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+
+  const iconClass = type === 'success' ? 'circle-check' : type === 'error' ? 'circle-exclamation' : 'circle-info';
+  toast.innerHTML = `
+    <i class="fa-solid fa-${iconClass}"></i>
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 250);
+  }, 3500);
 }
+
+// Global alert fallback mapped to Toast System
+function showAlert(message, type = 'success') {
+  showToast(message, type === 'danger' ? 'error' : type);
+}
+
+// Confirmation Modal Dialog System
+function showConfirmModal({ title = 'Confirm Action', message = 'Are you sure you want to perform this action?', confirmText = 'Confirm', confirmClass = 'btn-destructive', onConfirm }) {
+  let modal = document.getElementById('global-confirm-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'global-confirm-modal';
+    modal.className = 'modal';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: var(--status-orange);"></i> ${title}
+        </h3>
+        <button class="modal-close" id="modal-cancel-x">&times;</button>
+      </div>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">${message}</p>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button class="btn btn-outline" id="modal-cancel-btn">Cancel</button>
+        <button class="btn ${confirmClass}" id="modal-confirm-btn">${confirmText}</button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.add('active');
+
+  const closeModal = () => modal.classList.remove('active');
+
+  document.getElementById('modal-cancel-x').onclick = closeModal;
+  document.getElementById('modal-cancel-btn').onclick = closeModal;
+  document.getElementById('modal-confirm-btn').onclick = async () => {
+    closeModal();
+    if (typeof onConfirm === 'function') {
+      await onConfirm();
+    }
+  };
+}
+
+// Global Modal Dismissal Listeners (Escape key & Backdrop click)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal') && e.target.classList.contains('active')) {
+    e.target.classList.remove('active');
+  }
+});
+
+// Role Badge Component Renderer
+function renderRoleBadge(role) {
+  const normalized = (role || 'learner').toLowerCase();
+  if (normalized === 'instructor') {
+    return `<span class="badge role-badge-instructor"><i class="fa-solid fa-user-shield"></i> INSTRUCTOR</span>`;
+  } else if (normalized === 'ta') {
+    return `<span class="badge role-badge-ta"><i class="fa-solid fa-user-gear"></i> TA</span>`;
+  }
+  return `<span class="badge role-badge-learner"><i class="fa-solid fa-graduation-cap"></i> LEARNER</span>`;
+}
+
+// Empty State Renderer Utility
+function renderEmptyState({ icon = 'folder-open', title = 'No Data Found', message = 'There are no items to display at this time.', actionText = null, actionFn = null }) {
+  const actionButton = actionText ? `
+    <button class="btn btn-primary" style="margin-top: 1rem;" id="empty-state-action-btn">${actionText}</button>
+  ` : '';
+
+  setTimeout(() => {
+    const btn = document.getElementById('empty-state-action-btn');
+    if (btn && typeof actionFn === 'function') {
+      btn.onclick = actionFn;
+    }
+  }, 0);
+
+  return `
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <i class="fa-solid fa-${icon}"></i>
+      </div>
+      <div class="empty-state-title">${title}</div>
+      <div class="empty-state-subtitle">${message}</div>
+      ${actionButton}
+    </div>
+  `;
+}
+
+// Skeleton Loader Utility
+function renderSkeletonRows(count = 3) {
+  return Array(count).fill(0).map(() => `
+    <div class="skeleton-row"></div>
+  `).join('');
+}
+
+function renderSkeletonCards(count = 3) {
+  return Array(count).fill(0).map(() => `
+    <div class="card" style="min-height: 220px; justify-content: space-between;">
+      <div>
+        <div class="skeleton-block" style="height: 1.5rem; width: 60%; margin-bottom: 0.75rem;"></div>
+        <div class="skeleton-block" style="height: 1rem; width: 40%; margin-bottom: 1.25rem;"></div>
+        <div class="skeleton-block" style="height: 3.5rem; width: 100%; border-radius: 10px;"></div>
+      </div>
+      <div class="skeleton-block" style="height: 2.2rem; width: 100%; margin-top: 1rem;"></div>
+    </div>
+  `).join('');
+}
+
+async function uploadFileHelper(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const filedata = reader.result;
+        const res = await apiFetch('/upload', {
+          method: 'POST',
+          body: JSON.stringify({
+            filename: file.name,
+            filedata
+          })
+        });
+        resolve(res.data);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+

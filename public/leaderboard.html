@@ -4,40 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Classroom Leaderboard - ClassSync</title>
+  <meta name="description" content="Track learner points rankings, homework streaks, and academic achievements on the ClassSync leaderboard.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="container">
+  <main class="container">
     <div class="page-header">
       <div>
-        <h1 class="page-title"><i class="fa-solid fa-trophy"></i> Classroom Leaderboard & Streaks</h1>
-        <p class="card-subtitle">Total score ranking & consecutive full-mark streak system</p>
+        <h1 class="page-title" style="display: flex; align-items: center; gap: 0.75rem;">
+          <i class="fa-solid fa-trophy" style="color: var(--status-orange);"></i> Classroom Leaderboard & Streaks
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Learner points ranking & consecutive full-mark streak system</p>
       </div>
-      <a href="#" id="back-to-classroom-btn" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> Back to Classroom</a>
+      <a href="#" id="back-to-classroom-btn" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Back to Classroom
+      </a>
     </div>
 
-    <div class="table-responsive">
-      <table id="leaderboard-table">
-        <thead>
-          <tr>
-            <th style="width:70px;">Rank</th>
-            <th>Learner</th>
-            <th>Total Points Earned</th>
-            <th>Full-Mark Streak</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="4">Loading leaderboard standings...</td></tr>
-        </tbody>
-      </table>
+    <div id="leaderboard-table-container">
+      <div class="table-responsive">
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th style="width: 80px; text-align: center;">Rank</th>
+              <th>Learner Name</th>
+              <th>Total Points Earned</th>
+              <th>Full-Mark Streak</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading leaderboard standings...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  </main>
 
   <script src="/js/api.js"></script>
   <script src="/js/navbar.js"></script>

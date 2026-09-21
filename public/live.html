@@ -4,54 +4,59 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Class Session - ClassSync</title>
+  <meta name="description" content="Join interactive video calls with automatic 75% threshold attendance tracking in ClassSync.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="container">
+  <main class="container">
     <div class="page-header">
       <div>
-        <h1 class="page-title" id="session-title-header">Live Session</h1>
-        <p class="card-subtitle" id="session-meta">Loading session information...</p>
+        <h1 class="page-title" id="session-title-header">Live Class Session</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;" id="session-meta">Loading session information...</p>
       </div>
-      <a href="#" id="back-to-classroom-btn" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> Back to Classroom</a>
+      <a href="#" id="back-to-classroom-btn" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Back to Classroom
+      </a>
     </div>
 
     <!-- Attendance Tracker Status Pill -->
-    <div class="card" style="margin-bottom: 1.5rem; background: var(--table-head-bg); border-color: var(--border-color);">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <strong><i class="fa-solid fa-stopwatch"></i> Active Live Attendance Tracker:</strong>
-          <span id="tracker-timer">0 mins 0 secs</span> logged in session.
+    <div class="card" style="padding: 1.25rem; margin-bottom: 1.5rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="font-size: 0.9rem;">
+          <strong style="color: var(--text-main);"><i class="fa-solid fa-stopwatch" style="color: var(--primary-color); margin-right: 0.35rem;"></i> Active Attendance Heartbeat:</strong>
+          <span id="tracker-timer" style="font-family: var(--font-mono); font-weight: 700; color: var(--primary-color);">0 mins 0 secs</span> logged in live session.
         </div>
         <div id="attendance-status-badge">
-          <span class="badge badge-yellow">Threshold Check In Progress (&lt; 75%)</span>
+          <span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Tracking (&lt; 75% threshold)</span>
         </div>
       </div>
     </div>
 
     <!-- Jitsi Meet Frame -->
-    <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 2rem;">
-      <div style="background:#0f172a; color:#fff; padding:0.75rem 1rem; font-weight:600; display:flex; justify-content:space-between;">
-        <span><i class="fa-solid fa-video"></i> Embedded Jitsi Classroom Stream</span>
-        <span id="jitsi-room-name-tag">Room ID: ...</span>
+    <div style="border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); background-color: #020617; margin-bottom: 2rem;">
+      <div style="padding: 0.75rem 1.25rem; font-weight: 600; font-size: 0.875rem; color: #fff; background-color: #0f172a; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color);">
+        <span style="display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-video" style="color: var(--primary-color);"></i> Embedded Live Video Room</span>
+        <span id="jitsi-room-name-tag" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">Room ID: ...</span>
       </div>
-      <iframe id="jitsi-frame" style="width:100%; height:550px; border:none;" allow="camera; microphone; display-capture; autoplay"></iframe>
+      <iframe id="jitsi-frame" style="width: 100%; height: 550px; border: none;" allow="camera; microphone; display-capture; autoplay"></iframe>
     </div>
 
-    <!-- Attendance Roster & Instructor Override -->
+    <!-- Attendance Roster -->
     <div class="card">
-      <h3 style="margin-bottom:1rem;"><i class="fa-solid fa-clipboard-user"></i> Class Session Attendance Log</h3>
-      <div id="attendance-log-table" class="table-responsive">
-        <p>Loading attendance log...</p>
+      <h3 class="card-title" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-clipboard-user"></i> Class Attendance Log
+      </h3>
+      <div id="attendance-log-table">
+        <!-- Render Attendance Table -->
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="/js/api.js"></script>
   <script src="/js/navbar.js"></script>

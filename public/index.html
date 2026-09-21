@@ -3,63 +3,184 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - ClassSync</title>
+  <title>ClassSync - Academic Classroom Management Platform</title>
+  <meta name="description" content="Manage classrooms, public courses, homework assignments, submission matrices, live video sessions, and learner leaderboards.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="container">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Classroom Dashboard</h1>
-        <p class="card-subtitle">Manage your classrooms, assignments, and submissions</p>
+  <main class="container">
+    <!-- View Navigation Switcher (for authenticated users) -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <button id="view-browse-tab" class="btn btn-primary btn-sm active" style="border-radius: 8px;">
+          <i class="fa-solid fa-compass"></i> Discover Public Courses
+        </button>
+        <button id="view-dashboard-tab" class="btn btn-outline btn-sm auth-only" style="border-radius: 8px; display: none;">
+          <i class="fa-solid fa-gauge"></i> My Dashboard
+        </button>
       </div>
-      <div style="display: flex; gap: 0.5rem;">
-        <button class="btn btn-outline" id="open-join-modal-btn"><i class="fa-solid fa-plus"></i> Join Classroom</button>
-        <button class="btn btn-primary" id="open-create-modal-btn"><i class="fa-solid fa-square-plus"></i> Create Classroom</button>
+
+      <div style="display: flex; gap: 0.75rem;" class="auth-only">
+        <button id="open-join-modal-btn" class="btn btn-outline">
+          <i class="fa-solid fa-plus"></i> Join Classroom
+        </button>
+        <button id="open-create-modal-btn" class="btn btn-accent">
+          <i class="fa-solid fa-square-plus"></i> Create Classroom
+        </button>
       </div>
     </div>
 
-    <!-- Instructor Section -->
-    <div style="margin-bottom: 2rem;">
-      <h2 style="font-size: 1.2rem; margin-bottom: 1rem;"><i class="fa-solid fa-chalkboard-user"></i> Classrooms You Teach (Instructor)</h2>
-      <div class="grid" id="instructor-classrooms-grid">
-        <div class="card"><p>Loading classrooms...</p></div>
-      </div>
-    </div>
+    <!-- PUBLIC COURSE DISCOVERY SECTION -->
+    <section id="section-browse" style="margin-bottom: 2.5rem;">
+      <!-- Hero Banner -->
+      <div class="card" style="background: linear-gradient(135deg, rgba(29, 78, 216, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%); border: 1px solid var(--border-color); margin-bottom: 1.75rem; padding: 2rem;">
+        <div style="max-width: 700px;">
+          <span class="badge badge-blue" style="margin-bottom: 0.75rem;"><i class="fa-solid fa-globe"></i> Open Course Catalog</span>
+          <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text-main);">
+            Explore & Enroll in Academic Courses
+          </h1>
+          <p class="card-subtitle" style="font-size: 1rem; margin-bottom: 1.25rem;">
+            Browse free public courses or premium paid workshops hosted by verified instructors on ClassSync.
+          </p>
 
-    <!-- Learner / TA Section -->
-    <div>
-      <h2 style="font-size: 1.2rem; margin-bottom: 1rem;"><i class="fa-solid fa-user-graduate"></i> Classrooms You Joined (Learner / TA)</h2>
-      <div class="grid" id="joined-classrooms-grid">
-        <div class="card"><p>Loading classrooms...</p></div>
+          <!-- Search Bar & Filters -->
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="position: relative; flex: 1; min-width: 260px;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+              <input type="text" id="public-search-input" class="form-control" placeholder="Search by course title, instructor, or topic..." style="padding-left: 2.75rem;">
+            </div>
+            <select id="public-type-filter" class="form-control" style="width: auto; min-width: 140px;">
+              <option value="all">All Courses</option>
+              <option value="free">Free Courses</option>
+              <option value="paid">Paid Courses</option>
+            </select>
+          </div>
+        </div>
       </div>
+
+      <!-- Course Grid -->
+      <div class="grid" id="public-courses-grid">
+        <!-- Render Public Course Cards / Skeletons -->
+      </div>
+    </section>
+
+    <!-- AUTHENTICATED DASHBOARD SECTION (Hidden by default or toggled) -->
+    <div id="section-dashboard" style="display: none;">
+      <!-- Submission Activity Heatmap -->
+      <section style="margin-bottom: 2.5rem;" class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="font-size: 1.25rem; color: var(--primary-color);">
+              <i class="fa-solid fa-calendar-days"></i>
+            </div>
+            <div>
+              <h2 style="font-size: 1.1rem; font-weight: 700;">Submission Activity Heatmap</h2>
+              <p class="card-subtitle" style="margin: 0;">Daily solution submissions over the last 90 days</p>
+            </div>
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <select id="heatmap-homework-select" style="font-size: 0.8rem; padding: 0.35rem 0.6rem; border-radius: 6px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;">
+              <option value="">All Homeworks</option>
+            </select>
+            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted);">
+              <span>Less</span>
+              <div style="width: 12px; height: 12px; background: var(--border-color); border-radius: 2px;"></div>
+              <div style="width: 12px; height: 12px; background: #a5b4fc; border-radius: 2px;"></div>
+              <div style="width: 12px; height: 12px; background: #1d4ed8; border-radius: 2px;"></div>
+              <div style="width: 12px; height: 12px; background: #1e3a8a; border-radius: 2px;"></div>
+              <span>More</span>
+            </div>
+          </div>
+        </div>
+        <div id="heatmap-grid" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 0.5rem 0;">
+          <p class="card-subtitle">Loading submission activity...</p>
+        </div>
+      </section>
+
+      <!-- Instructor Section -->
+      <section style="margin-bottom: 2.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
+          <i class="fa-solid fa-chalkboard-user" style="color: var(--primary-color); font-size: 1.2rem;"></i>
+          <h2 style="font-size: 1.25rem; font-weight: 700;">Classrooms You Teach (Instructor)</h2>
+        </div>
+        <div class="grid" id="instructor-classrooms-grid">
+          <!-- Render Cards / Skeletons -->
+        </div>
+      </section>
+
+      <!-- Learner / TA Section -->
+      <section>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
+          <i class="fa-solid fa-user-graduate" style="color: var(--status-green); font-size: 1.2rem;"></i>
+          <h2 style="font-size: 1.25rem; font-weight: 700;">Classrooms You Joined (Learner / TA)</h2>
+        </div>
+        <div class="grid" id="joined-classrooms-grid">
+          <!-- Render Cards / Skeletons -->
+        </div>
+      </section>
     </div>
-  </div>
+  </main>
 
   <!-- Create Classroom Modal -->
   <div class="modal" id="create-modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 540px;">
       <div class="modal-header">
-        <h3>Create New Classroom</h3>
+        <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-square-plus" style="color: var(--primary-color);"></i> Create New Classroom
+        </h3>
         <button class="modal-close" id="close-create-modal">&times;</button>
       </div>
       <form id="create-classroom-form">
+        <div id="create-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+
         <div class="form-group">
           <label for="create-name">Classroom Name *</label>
-          <input type="text" id="create-name" class="form-control" placeholder="e.g. CSE 3522: DBMS Lab" required>
+          <input type="text" id="create-name" class="form-control" placeholder="e.g. CSE 3522: Database Management Systems" required>
         </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="create-visibility">Course Visibility *</label>
+            <select id="create-visibility" class="form-control">
+              <option value="private">Private (Room & Password)</option>
+              <option value="public">Public (Discoverable)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="create-is-paid">Course Pricing *</label>
+            <select id="create-is-paid" class="form-control">
+              <option value="false">Free Course</option>
+              <option value="true">Paid Course</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" id="create-price-group" style="display: none;">
+          <label for="create-price">Course Price ($ USD) *</label>
+          <input type="number" step="0.01" min="0" id="create-price" class="form-control" placeholder="e.g. 49.99">
+        </div>
+
         <div class="form-group">
-          <label for="create-desc">Description</label>
-          <textarea id="create-desc" class="form-control" placeholder="Course section, schedule, etc."></textarea>
+          <label for="create-cover-url">Cover Photo Image URL</label>
+          <input type="url" id="create-cover-url" class="form-control" placeholder="https://images.unsplash.com/photo-...">
         </div>
-        <div style="text-align: right; margin-top: 1rem;">
-          <button type="submit" class="btn btn-primary">Create Classroom</button>
+
+        <div class="form-group">
+          <label for="create-desc">Course Description</label>
+          <textarea id="create-desc" class="form-control" style="height: 80px;" placeholder="Brief overview, syllabus, target audience..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" id="cancel-create-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submit-create-btn">
+            <i class="fa-solid fa-check"></i> Create Classroom
+          </button>
         </div>
       </form>
     </div>
@@ -69,22 +190,96 @@
   <div class="modal" id="join-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Join Classroom</h3>
+        <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-plus-circle" style="color: var(--primary-color);"></i> Join Private Classroom
+        </h3>
         <button class="modal-close" id="close-join-modal">&times;</button>
       </div>
       <form id="join-classroom-form">
+        <div id="join-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+
         <div class="form-group">
           <label for="join-room-num">Room Number *</label>
           <input type="text" id="join-room-num" class="form-control" placeholder="e.g. ROOM-123456" required>
         </div>
         <div class="form-group">
-          <label for="join-room-pass">Room Password *</label>
-          <input type="password" id="join-room-pass" class="form-control" placeholder="Room Password" required>
+          <label for="join-room-pass">Room Access Password *</label>
+          <input type="password" id="join-room-pass" class="form-control" placeholder="Enter room password" required>
         </div>
-        <div style="text-align: right; margin-top: 1rem;">
-          <button type="submit" class="btn btn-primary">Join Classroom</button>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" id="cancel-join-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submit-join-btn">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i> Join Classroom
+          </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Paid Course Enrollment Request Modal -->
+  <div class="modal" id="paid-enroll-modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-credit-card" style="color: var(--accent-color);"></i> Paid Course Enrollment Request
+        </h3>
+        <button class="modal-close" id="close-paid-enroll-modal">&times;</button>
+      </div>
+      <form id="paid-enroll-form">
+        <div id="paid-enroll-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+        <input type="hidden" id="paid-course-id">
+
+        <div class="card" style="background: rgba(29, 78, 216, 0.05); border: 1px solid var(--border-color); margin-bottom: 1.25rem; padding: 0.85rem 1rem;">
+          <p style="margin: 0; font-size: 0.95rem; font-weight: 700;" id="paid-course-title">Course Title</p>
+          <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--accent-color); font-weight: 600;" id="paid-course-price-info">Course Price: $0.00</p>
+        </div>
+
+        <div class="form-group">
+          <label for="paid-method">Payment Method *</label>
+          <select id="paid-method" class="form-control" required>
+            <option value="bKash">bKash Personal / Merchant</option>
+            <option value="Nagad">Nagad</option>
+            <option value="Rocket">Rocket</option>
+            <option value="Bank Transfer">Bank Wire / Transfer</option>
+            <option value="Card/Other">Credit/Debit Card or Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="paid-phone">Payer Phone Number / Account</label>
+          <input type="text" id="paid-phone" class="form-control" placeholder="e.g. 01712345678">
+        </div>
+
+        <div class="form-group">
+          <label for="paid-trx">Transaction ID (TrxID) *</label>
+          <input type="text" id="paid-trx" class="form-control" placeholder="e.g. TRX98237482" required>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" id="cancel-paid-enroll-btn">Cancel</button>
+          <button type="submit" class="btn btn-accent" id="submit-paid-enroll-btn">
+            <i class="fa-solid fa-paper-plane"></i> Submit Request
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Login Prompt Modal for Logged-Out Visitors -->
+  <div class="modal" id="login-prompt-modal">
+    <div class="modal-content" style="max-width: 420px; text-align: center;">
+      <div style="font-size: 2.5rem; color: var(--primary-color); margin-bottom: 0.75rem;">
+        <i class="fa-solid fa-user-lock"></i>
+      </div>
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">Authentication Required</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+        Please log in or register a ClassSync account to enroll in public courses and access your learning dashboard.
+      </p>
+      <div style="display: flex; gap: 0.75rem; justify-content: center;">
+        <a href="/login.html" class="btn btn-primary" style="flex: 1;"><i class="fa-solid fa-right-to-bracket"></i> Log In</a>
+        <a href="/register.html" class="btn btn-outline" style="flex: 1;"><i class="fa-solid fa-user-plus"></i> Register</a>
+      </div>
+      <button class="btn btn-sm btn-outline" id="close-login-prompt-btn" style="margin-top: 1rem; width: 100%;">Close</button>
     </div>
   </div>
 

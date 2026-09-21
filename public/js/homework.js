@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const homeworkId = urlParams.get('id');
 
   if (!homeworkId) {
-    alert('No homework ID specified!');
+    showToast('No homework ID specified!', 'error');
     window.location.href = '/index.html';
     return;
   }
@@ -17,177 +17,391 @@ document.addEventListener('DOMContentLoaded', async () => {
       homeworkData = res.data;
 
       document.getElementById('hw-title').textContent = homeworkData.title;
-      document.getElementById('hw-meta').innerHTML = `
-        Classroom: <strong>${homeworkData.classroom_name}</strong> | 
-        Points: <strong>${homeworkData.total_points}</strong> | 
-        Deadline: ${homeworkData.deadline ? new Date(homeworkData.deadline).toLocaleString() : 'No deadline'}
-      `;
       document.getElementById('back-to-classroom-btn').href = `/classroom.html?id=${homeworkData.classroom_id}`;
 
-      if (homeworkData.is_staff) {
+      document.getElementById('hw-meta').innerHTML = `
+        Classroom: <strong class="text-slate-800 dark:text-slate-200">${homeworkData.classroom_name}</strong> &nbsp;|&nbsp; 
+        Points: <strong class="text-slate-800 dark:text-slate-200">${homeworkData.total_points}</strong> &nbsp;|&nbsp; 
+        Deadline: ${homeworkData.deadline ? new Date(homeworkData.deadline).toLocaleString() : 'No Deadline'}
+        <span id="deadline-countdown-badge" class="ml-2"></span>
+      `;
+      const userRole = (homeworkData.user_role || '').toLowerCase();
+      const isInstructor = userRole === 'instructor' || homeworkData.creator_id == getActiveUserId() || (homeworkData.is_staff && !userRole);
+      const isStaff = homeworkData.is_staff || isInstructor || userRole === 'ta';
+
+      if (isInstructor) {
+        document.querySelectorAll('.instructor-only').forEach(el => el.style.display = 'inline-flex');
+      }
+      if (isStaff) {
         document.querySelectorAll('.staff-only').forEach(el => el.style.display = 'inline-flex');
       }
 
+      startDeadlineCountdown(homeworkData.deadline);
       renderQuestions(homeworkData.questions);
     } catch (err) {
-      alert(`Error loading homework: ${err.message}`);
+      showToast(`Error loading homework: ${err.message}`, 'error');
     }
+  };
+
+  let countdownInterval = null;
+  const startDeadlineCountdown = (deadlineStr) => {
+    if (countdownInterval) clearInterval(countdownInterval);
+    const badgeEl = document.getElementById('deadline-countdown-badge');
+    if (!badgeEl) return;
+
+    if (!deadlineStr) {
+      badgeEl.innerHTML = `<span class="badge badge-gray">No Deadline</span>`;
+      return;
+    }
+
+    const targetTime = new Date(deadlineStr).getTime();
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        badgeEl.innerHTML = `<span class="badge badge-red"><i class="fa-solid fa-clock"></i> OVERDUE</span>`;
+        if (countdownInterval) clearInterval(countdownInterval);
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      let parts = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0 || days > 0) parts.push(`${hours}h`);
+      parts.push(`${mins}m`);
+      parts.push(`${secs}s`);
+
+      badgeEl.innerHTML = `
+        <span class="badge badge-yellow" style="font-family: var(--font-mono); font-size: 0.775rem;">
+          <i class="fa-solid fa-clock"></i> ${parts.join(' ')} remaining
+        </span>
+      `;
+    };
+
+    updateTimer();
+    countdownInterval = setInterval(updateTimer, 1000);
   };
 
   const renderQuestions = (questions) => {
     const container = document.getElementById('questions-container');
 
+    const userRole = (homeworkData?.user_role || '').toLowerCase();
+    const isInstructor = userRole === 'instructor' || homeworkData?.creator_id == getActiveUserId() || (homeworkData?.is_staff && !userRole);
+
     if (questions.length === 0) {
-      container.innerHTML = '<div class="card"><p>No questions added to this homework set yet.</p></div>';
+      container.innerHTML = renderEmptyState({
+        icon: 'book-open',
+        title: 'No Questions Added Yet',
+        message: isInstructor 
+          ? 'Add Question 1 to this homework set for learners to solve.' 
+          : 'No questions have been added to this homework set yet.',
+        actionText: isInstructor ? '<i class="fa-solid fa-square-plus"></i> Add Question 1' : null,
+        actionFn: isInstructor ? () => document.getElementById('add-q-modal').classList.add('active') : null
+      });
       return;
     }
 
-    container.innerHTML = questions.map((q, idx) => `
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-          <h3>Question ${idx + 1} (${q.points} Points)</h3>
-          <span class="badge badge-blue">Type: ${q.question_type.toUpperCase()}</span>
-        </div>
-        <div style="margin-bottom: 1rem; font-size: 1rem;">${q.question_text}</div>
+    let html = questions.map((q, idx) => {
+      const qType = (q.question_type || 'text').toLowerCase();
+      let typeBadge = '';
+      if (qType === 'pdf') {
+        typeBadge = `<span class="badge badge-red"><i class="fa-solid fa-file-pdf"></i> PDF Attachment</span>`;
+      } else if (qType === 'pptx') {
+        typeBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-file-powerpoint"></i> PPTX Presentation</span>`;
+      } else if (qType === 'docx') {
+        typeBadge = `<span class="badge badge-blue"><i class="fa-solid fa-file-word"></i> DOCX Document</span>`;
+      } else if (qType === 'link') {
+        typeBadge = `<span class="badge badge-blue"><i class="fa-solid fa-link"></i> Web Link Reference</span>`;
+      } else {
+        typeBadge = `<span class="badge badge-gray"><i class="fa-solid fa-file-code"></i> Code / Text Solution</span>`;
+      }
 
-        <!-- Learner Submission Box -->
-        <div style="background:var(--table-head-bg); padding:1rem; border-radius:6px; margin-bottom:1rem; border:1px solid var(--border-color);">
-          <h4>Your Solution Submission</h4>
-          ${q.submission_id ? `
-            <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem;">
-              Submitted on ${new Date(q.submitted_at).toLocaleString()} 
-              ${q.is_late ? `<span class="badge badge-yellow">LATE (-${q.penalty_applied}%)</span>` : '<span class="badge badge-green">ON TIME</span>'}
-            </div>
-            <div class="code-box">${escapeHtml(q.code_content || q.file_url || 'No content')}</div>
-            
-            ${q.score !== null ? `
-              <div style="margin-top:0.5rem; padding:0.5rem; background:rgba(16,185,129,0.15); border-radius:4px;">
-                <strong>Grade:</strong> ${q.score} / ${q.points} pts | 
-                <strong>Feedback:</strong> ${q.feedback || 'None'}
+      return `
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+            <h3 class="card-title" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--primary-color);">
+              <i class="fa-solid fa-circle-question"></i> Question ${idx + 1} &nbsp;<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">(${q.points} Points)</span>
+            </h3>
+            ${typeBadge}
+          </div>
+
+          <div style="font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.25rem; font-weight: 500;">
+            ${q.question_text}
+            ${q.question_data ? `
+              <div style="margin-top: 0.75rem;">
+                <a href="${q.question_data}" target="_blank" class="btn btn-outline btn-sm">
+                  <i class="fa-solid fa-paperclip"></i> View / Download Question File (${q.question_data.split('.').pop().toUpperCase()})
+                </a>
               </div>
-            ` : '<p style="font-size:0.85rem; color:var(--status-orange);">Pending instructor grading...</p>'}
-          ` : '<p style="font-size:0.85rem; color:var(--text-muted);">You have not submitted a solution yet.</p>'}
-
-          <!-- Submission Form -->
-          <form style="margin-top:1rem;" onsubmit="handleQuestionSubmit(event, ${q.question_id})">
-            <div class="form-group">
-              <label>${q.question_type === 'text' ? 'Code / Text Solution' : 'Link / File URL'}</label>
-              <textarea id="sub-input-${q.question_id}" class="form-control" placeholder="Enter solution or paste code..." required>${q.code_content || q.file_url || ''}</textarea>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <small style="color:var(--text-muted);">Note: Resubmitting overwrites previous submission.</small>
-              <button type="submit" class="btn btn-primary btn-sm">${q.submission_id ? 'Overwrite Submission' : 'Submit Solution'}</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Post-Submission Answer Key Section -->
-        <div style="margin-bottom:1rem;">
-          <button class="btn btn-outline btn-sm" onclick="toggleAnswerKey(${q.question_id})"><i class="fa-solid fa-key"></i> View Instructor Answer Key</button>
-          <div id="answer-key-box-${q.question_id}" style="display:none; margin-top:0.5rem; padding:0.75rem; background:var(--table-head-bg); border-radius:6px; border:1px solid var(--border-color);">
-            <p>Loading answer key...</p>
+            ` : ''}
           </div>
-        </div>
 
-        <!-- Staff Submission List Viewer -->
-        ${homeworkData.is_staff ? `
-          <div style="border-top:1px solid var(--border-color); padding-top:1rem; margin-top:1rem;">
-            <h4>Instructor View: Learner Submissions for Q${idx + 1}</h4>
-            <button class="btn btn-outline btn-sm" onclick="loadSubmissionsForQ(${q.question_id})">Load Submissions List</button>
-            <div id="staff-subs-list-${q.question_id}" style="margin-top:0.5rem;"></div>
+          <!-- Learner Submission Box -->
+          <div style="padding: 1.25rem; border-radius: 12px; background-color: var(--table-head-bg); border: 1px solid var(--border-color); margin-bottom: 1rem;">
+            <h4 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem; color: var(--text-muted);">Your Solution Submission</h4>
+            ${q.submission_id ? `
+              <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <span>Submitted on ${new Date(q.submitted_at).toLocaleString()}</span> 
+                ${q.is_late ? `<span class="badge badge-yellow">LATE (-${q.penalty_applied}%)</span>` : '<span class="badge badge-green">ON TIME</span>'}
+              </div>
+              <div class="code-box">${escapeHtml(q.code_content || q.file_url || 'No content')}</div>
+              ${q.file_url ? `
+                <div style="margin-top: 0.5rem;">
+                  <a href="${q.file_url}" target="_blank" class="btn btn-outline btn-sm">
+                    <i class="fa-solid fa-file-arrow-down"></i> View Attached Submission File
+                  </a>
+                </div>
+              ` : ''}
+              ${q.score !== null ? `
+                <div style="padding: 0.75rem 1rem; border-radius: 8px; background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.85rem; color: var(--status-green); margin-top: 0.5rem;">
+                  <strong>Grade:</strong> ${q.score} / ${q.points} Points &nbsp;|&nbsp; 
+                  <strong>Feedback:</strong> ${q.feedback || 'None provided'}
+                </div>
+              ` : '<p style="font-size: 0.8rem; color: var(--status-orange); font-weight: 600; margin-top: 0.5rem;">Pending instructor grading...</p>'}
+            ` : '<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">You have not submitted a solution for Question ' + (idx + 1) + ' yet.</p>'}
+
+            <!-- Submission Form -->
+            <form onsubmit="handleQuestionSubmit(event, ${q.question_id})" style="margin-top: 0.75rem;">
+              <div class="form-group">
+                <label style="font-weight: 600; font-size: 0.85rem;">Solution Content (Paste Text/Code or Upload File)</label>
+                <textarea id="sub-input-${q.question_id}" class="form-control" style="font-family: var(--font-mono); font-size: 0.85rem; height: 95px;" placeholder="Type code / solution text or drag & drop a file below...">${q.code_content || ''}</textarea>
+                
+                <div class="file-dropzone" id="sub-dropzone-${q.question_id}" onclick="document.getElementById('sub-file-${q.question_id}').click()">
+                  <i class="fa-solid fa-cloud-arrow-up file-dropzone-icon"></i>
+                  <div class="file-dropzone-text">Drag & Drop Solution File (PDF, PPTX, DOCX, Code, Text, ZIP)</div>
+                  <div class="file-dropzone-hint">Or click here to browse file</div>
+                  <input type="file" id="sub-file-${q.question_id}" style="display:none;" accept=".pdf,.pptx,.docx,.txt,.zip,.py,.java,.cpp,.c,.sql,.js">
+                  <input type="hidden" id="sub-file-url-${q.question_id}" value="${q.file_url || ''}">
+                  <div id="sub-file-status-${q.question_id}" style="margin-top: 0.25rem;">
+                    ${q.file_url ? `
+                      <div class="file-chip">
+                        <i class="fa-solid fa-file"></i> Attached: <a href="${q.file_url}" target="_blank">${q.file_url.split('/').pop()}</a>
+                        <i class="fa-solid fa-xmark file-chip-remove" title="Remove attachment" onclick="event.stopPropagation(); clearDropzoneAttachment('sub-file-url-${q.question_id}', 'sub-file-status-${q.question_id}')"></i>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Submitting updates your solution for Question ${idx + 1}.</small>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i class="fa-solid fa-paper-plane"></i> ${q.submission_id ? 'Update Solution' : 'Submit Solution'}
+                </button>
+              </div>
+            </form>
           </div>
-        ` : ''}
-      </div>
-    `).join('');
+
+          <!-- Post-Submission Answer Key Section -->
+          <div style="margin-bottom: 1rem;">
+            <button class="btn btn-outline btn-sm" onclick="toggleAnswerKey(${q.question_id})">
+              <i class="fa-solid fa-key"></i> View Instructor Answer Key
+            </button>
+            <div id="answer-key-box-${q.question_id}" style="display: none; margin-top: 0.75rem; padding: 1rem; border-radius: 12px; background-color: var(--table-head-bg); border: 1px solid var(--border-color);">
+              <p style="font-size: 0.8rem; color: var(--text-muted);">Loading answer key...</p>
+            </div>
+          </div>
+
+          <!-- Staff Submission List Viewer -->
+          ${homeworkData.is_staff ? `
+            <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+              <h4 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Staff View: Learner Submissions for Question ${idx + 1}</h4>
+              <button class="btn btn-outline btn-sm" onclick="loadSubmissionsForQ(${q.question_id})">
+                <i class="fa-solid fa-users-viewfinder"></i> Load Submissions Roster
+              </button>
+              <div id="staff-subs-list-${q.question_id}" style="margin-top: 0.75rem;"></div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    if (isInstructor) {
+      html += `
+        <div style="text-align: center; margin-top: 1rem; margin-bottom: 2rem;">
+          <button class="btn btn-accent" onclick="document.getElementById('add-q-modal').classList.add('active')">
+            <i class="fa-solid fa-square-plus"></i> Add Question ${questions.length + 1}
+          </button>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+
+    // Attach dropzone listeners for each question
+    questions.forEach(q => {
+      setupDropzone(`sub-dropzone-${q.question_id}`, `sub-file-${q.question_id}`, `sub-file-status-${q.question_id}`, `sub-file-url-${q.question_id}`, `sub-input-${q.question_id}`);
+    });
   };
 
-  // Helper functions
+  window.getSubmissionTypeBadge = (type) => {
+    const t = (type || 'text').toLowerCase();
+    if (t === 'pdf') return `<span class="badge badge-red"><i class="fa-solid fa-file-pdf"></i> PDF File</span>`;
+    if (t === 'pptx') return `<span class="badge badge-yellow"><i class="fa-solid fa-file-powerpoint"></i> PPTX Presentation</span>`;
+    if (t === 'docx') return `<span class="badge badge-blue"><i class="fa-solid fa-file-word"></i> DOCX Document</span>`;
+    if (t === 'link') return `<span class="badge badge-blue"><i class="fa-solid fa-link"></i> Web Link</span>`;
+    return `<span class="badge badge-gray"><i class="fa-solid fa-file-code"></i> Code / Text</span>`;
+  };
+
+  // Learner Submission Box
+  window.handleSubmissionFileUpload = async (questionId, inputEl) => {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById(`sub-file-status-${questionId}`);
+    statusEl.innerHTML = `<span style="color: var(--primary-color);"><i class="fa-solid fa-spinner fa-spin"></i> Uploading ${file.name}...</span>`;
+
+    try {
+      const uploaded = await uploadFileHelper(file);
+      document.getElementById(`sub-file-url-${questionId}`).value = uploaded.url;
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      const subTypeSelect = document.getElementById(`sub-type-select-${questionId}`);
+      if (subTypeSelect) {
+        if (ext === 'pdf') subTypeSelect.value = 'pdf';
+        else if (ext === 'pptx') subTypeSelect.value = 'pptx';
+        else if (ext === 'docx') subTypeSelect.value = 'docx';
+        else subTypeSelect.value = 'text';
+      }
+
+      const isTextOrCode = /\.(txt|py|js|html|css|cpp|c|java|sql|json|md)$/i.test(file.name);
+      if (isTextOrCode) {
+        const textReader = new FileReader();
+        textReader.onload = () => {
+          document.getElementById(`sub-input-${questionId}`).value = textReader.result;
+        };
+        textReader.readAsText(file);
+      }
+
+      statusEl.innerHTML = `<span style="color: var(--status-green); font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Uploaded: <a href="${uploaded.url}" target="_blank">${uploaded.original_name}</a></span>`;
+      showToast('File uploaded successfully!', 'success');
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color: var(--status-red);"><i class="fa-solid fa-circle-exclamation"></i> Upload failed: ${err.message}</span>`;
+      showToast(`Upload failed: ${err.message}`, 'error');
+    }
+  };
+
   window.handleQuestionSubmit = async (e, questionId) => {
     e.preventDefault();
-    const inputVal = document.getElementById(`sub-input-${questionId}`).value;
+    const subType = document.getElementById(`sub-type-select-${questionId}`)?.value || 'text';
+    const codeContent = document.getElementById(`sub-input-${questionId}`)?.value;
+    const fileUrl = document.getElementById(`sub-file-url-${questionId}`)?.value;
+
+    if (!codeContent && !fileUrl) {
+      showToast('Please type a solution, paste a link, or upload a solution file.', 'error');
+      return;
+    }
 
     try {
       const res = await apiFetch(`/questions/${questionId}/submit`, {
         method: 'POST',
-        body: JSON.stringify({ code_content: inputVal })
+        body: JSON.stringify({
+          submission_type: subType,
+          code_content: codeContent,
+          file_url: fileUrl
+        })
       });
-      showAlert(res.message);
+      showToast(res.message, 'success');
       loadHomeworkDetails();
     } catch (err) {
-      showAlert(err.message, 'error');
+      showToast(err.message, 'error');
     }
   };
 
   window.toggleAnswerKey = async (questionId) => {
     const box = document.getElementById(`answer-key-box-${questionId}`);
-    if (box.style.display === 'block') {
+    if (box.style.display !== 'none' && box.style.display !== '') {
       box.style.display = 'none';
       return;
     }
 
     box.style.display = 'block';
-    box.innerHTML = 'Fetching answer key...';
+    box.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted);">Fetching official answer key...</p>';
 
     try {
       const res = await apiFetch(`/questions/${questionId}/answer`);
       box.innerHTML = `
-        <div style="font-size:0.85rem; font-weight:600; color:var(--primary-color);">Official Solution (by ${res.data.instructor_name}):</div>
-        <div class="code-box" style="margin-top:0.25rem;">${escapeHtml(res.data.answer_text || res.data.answer_file_url)}</div>
+        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary-color); margin-bottom: 0.5rem;">Official Solution (by ${res.data.instructor_name}):</div>
+        <div class="code-box">${escapeHtml(res.data.answer_text || res.data.answer_file_url)}</div>
       `;
     } catch (err) {
-      box.innerHTML = `<p style="color:var(--status-red); font-size:0.85rem;"><i class="fa-solid fa-lock"></i> ${err.message}</p>`;
+      box.innerHTML = `<p style="font-size: 0.8rem; color: var(--status-red); font-weight: 600;"><i class="fa-solid fa-lock"></i> ${err.message}</p>`;
     }
   };
 
   window.loadSubmissionsForQ = async (questionId) => {
     const container = document.getElementById(`staff-subs-list-${questionId}`);
-    container.innerHTML = 'Loading submissions...';
+    container.innerHTML = renderSkeletonRows(2);
 
     try {
       const res = await apiFetch(`/questions/${questionId}/submissions`);
       const subs = res.data;
 
       if (subs.length === 0) {
-        container.innerHTML = '<p class="card-subtitle">No submissions recorded for this question yet.</p>';
+        container.innerHTML = renderEmptyState({
+          icon: 'inbox',
+          title: 'No Submissions Yet',
+          message: 'No learner submissions recorded for this question yet.'
+        });
         return;
       }
 
       container.innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Learner</th>
-              <th>Submitted At</th>
-              <th>Late?</th>
-              <th>Score</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${subs.map(s => `
+        <div class="table-responsive">
+          <table>
+            <thead>
               <tr>
-                <td><strong>${s.learner_name}</strong> (${s.learner_email})</td>
-                <td>${new Date(s.submitted_at).toLocaleString()}</td>
-                <td>${s.is_late ? `<span class="badge badge-yellow">Late (-${s.penalty_applied}%)</span>` : '<span class="badge badge-green">On Time</span>'}</td>
-                <td>${s.score !== null ? `<strong>${s.score} pts</strong>` : '<span class="badge badge-gray">Not Graded</span>'}</td>
-                <td>
-                  <button class="btn btn-primary btn-sm" onclick="openGradeModal(${s.submission_id}, '${escapeHtml(s.learner_name)}', '${escapeHtml(s.code_content || '')}', ${s.score || ''}, '${escapeHtml(s.feedback || '')}')">
-                    Grade & Review (${s.review_count})
-                  </button>
-                </td>
+                <th>Learner</th>
+                <th>Format Submitted</th>
+                <th>Submitted At</th>
+                <th>Timing</th>
+                <th>Score</th>
+                <th>Action</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${subs.map(s => `
+                <tr>
+                  <td>
+                    <div style="font-weight: 700;">${escapeHtml(s.learner_name)}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(s.learner_email)}</div>
+                  </td>
+                  <td>${getSubmissionTypeBadge(s.submission_type)}</td>
+                  <td style="color: var(--text-muted);">${new Date(s.submitted_at).toLocaleString()}</td>
+                  <td>
+                    ${s.is_late ? `<span class="badge badge-yellow">Late (-${s.penalty_applied}%)</span>` : '<span class="badge badge-green">On Time</span>'}
+                  </td>
+                  <td style="font-weight: 700;">
+                    ${s.score !== null ? `${s.score} pts` : '<span class="badge badge-gray">Not Graded</span>'}
+                  </td>
+                  <td>
+                    <button class="btn btn-primary btn-sm" onclick="openGradeModal(${s.submission_id}, '${escapeHtml(s.learner_name)}', '${escapeHtml(s.code_content || s.file_url || '')}', ${s.score || ''}, '${escapeHtml(s.feedback || '')}')">
+                      <i class="fa-solid fa-pen-ruler"></i> Grade & Review (${s.review_count})
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       `;
     } catch (err) {
-      container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      container.innerHTML = `<div style="padding: 1rem; border-radius: 8px; background-color: rgba(239,68,68,0.1); color: var(--status-red); font-size: 0.85rem;">Error: ${err.message}</div>`;
     }
   };
 
   // Grade Modal Logic
   const gradeModal = document.getElementById('grade-modal');
-  document.getElementById('close-grade-modal').onclick = () => gradeModal.classList.remove('active');
+  const closeGradeBtn = document.getElementById('close-grade-modal');
+  const cancelGradeBtn = document.getElementById('cancel-grade-btn');
+
+  if (closeGradeBtn) closeGradeBtn.onclick = () => gradeModal.classList.remove('active');
+  if (cancelGradeBtn) cancelGradeBtn.onclick = () => gradeModal.classList.remove('active');
 
   window.openGradeModal = async (subId, learnerName, codeContent, currentScore, currentFeedback) => {
     activeSubmissionIdForGrading = subId;
@@ -207,17 +421,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const reviews = res.data;
 
       if (reviews.length === 0) {
-        listEl.innerHTML = '<p class="card-subtitle">No line reviews added yet.</p>';
+        listEl.innerHTML = '<p class="text-xs text-slate-400">No line comments added yet.</p>';
         return;
       }
 
       listEl.innerHTML = reviews.map(r => `
-        <div class="review-annotation">
-          <strong>Lines ${r.line_start}-${r.line_end} (${r.reviewer_name}):</strong> ${r.comment}
+        <div class="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs">
+          <strong class="text-indigo-600 dark:text-indigo-400">Lines ${r.line_start}-${r.line_end} (${r.reviewer_name}):</strong> ${r.comment}
         </div>
       `).join('');
     } catch (err) {
-      listEl.innerHTML = `<p style="color:red;">Error loading reviews: ${err.message}</p>`;
+      listEl.innerHTML = `<p class="text-xs text-rose-500">Error loading reviews: ${err.message}</p>`;
     }
   };
 
@@ -237,9 +451,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       document.getElementById('add-review-form').reset();
       await loadInlineCodeReviews(activeSubmissionIdForGrading);
-      showAlert('Line comment added!');
+      showToast('Line review comment added!', 'success');
     } catch (err) {
-      showAlert(err.message, 'error');
+      showToast(err.message, 'error');
     }
   };
 
@@ -248,46 +462,174 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     if (!activeSubmissionIdForGrading) return;
 
+    const scoreVal = document.getElementById('grade-score').value;
+    const errorBox = document.getElementById('grade-error');
+    errorBox.classList.add('hidden');
+
+    if (!scoreVal) {
+      errorBox.textContent = 'Grade score is required.';
+      errorBox.classList.remove('hidden');
+      return;
+    }
+
     try {
       await apiFetch(`/submissions/${activeSubmissionIdForGrading}/grade`, {
         method: 'POST',
         body: JSON.stringify({
-          score: document.getElementById('grade-score').value,
+          score: scoreVal,
           feedback: document.getElementById('grade-feedback').value,
           is_draft: document.getElementById('grade-draft').checked
         })
       });
       gradeModal.classList.remove('active');
-      showAlert('Grade submitted!');
+      showToast('Grade submitted successfully!', 'success');
       loadHomeworkDetails();
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.classList.remove('hidden');
+      showToast(err.message, 'error');
     }
   };
 
+  window.clearDropzoneAttachment = (hiddenUrlId, statusId) => {
+    const hiddenInput = document.getElementById(hiddenUrlId);
+    const statusEl = document.getElementById(statusId);
+    if (hiddenInput) hiddenInput.value = '';
+    if (statusEl) statusEl.innerHTML = '';
+  };
+
+  window.setupDropzone = (dropzoneId, fileInputId, statusId, hiddenUrlId, textareaId = null) => {
+    const dropzone = document.getElementById(dropzoneId);
+    const fileInput = document.getElementById(fileInputId);
+    const statusEl = document.getElementById(statusId);
+    const hiddenInput = document.getElementById(hiddenUrlId);
+    const textarea = textareaId ? document.getElementById(textareaId) : null;
+
+    if (!dropzone || !fileInput) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        fileInput.files = files;
+        processFileUpload(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files[0]) {
+        processFileUpload(fileInput.files[0]);
+      }
+    });
+
+    async function processFileUpload(file) {
+      if (!statusEl) return;
+      statusEl.innerHTML = `<span style="color: var(--primary-color); font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-spinner fa-spin"></i> Uploading ${file.name}...</span>`;
+      try {
+        const uploaded = await uploadFileHelper(file);
+        if (hiddenInput) hiddenInput.value = uploaded.url;
+
+        statusEl.innerHTML = `
+          <div class="file-chip">
+            <i class="fa-solid fa-file"></i> Attached: <a href="${uploaded.url}" target="_blank">${uploaded.original_name}</a>
+            <i class="fa-solid fa-xmark file-chip-remove" title="Remove attachment" onclick="event.stopPropagation(); clearDropzoneAttachment('${hiddenUrlId}', '${statusId}')"></i>
+          </div>
+        `;
+
+        if (textarea && /\.(txt|py|js|html|css|cpp|c|java|sql|json|md)$/i.test(file.name)) {
+          const reader = new FileReader();
+          reader.onload = () => { textarea.value = reader.result; };
+          reader.readAsText(file);
+        }
+        showToast(`Uploaded ${uploaded.original_name} successfully!`, 'success');
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color: var(--status-red); font-size: 0.8rem; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Upload failed: ${err.message}</span>`;
+        showToast(`Upload error: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  // Setup dropzones for Add Question Modal
+  setupDropzone('q-dropzone', 'q-file-picker', 'q-file-status', 'q-file-url', 'q-text');
+  setupDropzone('q-ans-dropzone', 'q-ans-file-picker', 'q-ans-file-status', 'q-ans-file-url', 'q-ans-text');
+
   // Add Question Modal
   const addQModal = document.getElementById('add-q-modal');
-  document.getElementById('open-add-q-btn').onclick = () => addQModal.classList.add('active');
-  document.getElementById('close-add-q-modal').onclick = () => addQModal.classList.remove('active');
+  const openAddQBtn = document.getElementById('open-add-q-btn');
+  const closeAddQBtn = document.getElementById('close-add-q-modal');
+  const cancelAddQBtn = document.getElementById('cancel-add-q-btn');
+
+  if (openAddQBtn) openAddQBtn.onclick = () => addQModal.classList.add('active');
+  if (closeAddQBtn) closeAddQBtn.onclick = () => addQModal.classList.remove('active');
+  if (cancelAddQBtn) cancelAddQBtn.onclick = () => addQModal.classList.remove('active');
 
   document.getElementById('add-q-form').onsubmit = async (e) => {
     e.preventDefault();
+    const qText = document.getElementById('q-text').value.trim();
+    const errorBox = document.getElementById('add-q-error');
+    errorBox.style.display = 'none';
+
+    if (!qText) {
+      errorBox.textContent = 'Question Prompt is required.';
+      errorBox.style.display = 'block';
+      return;
+    }
+
     try {
+      let questionDataUrl = document.getElementById('q-file-url')?.value || null;
+      let answerFileUrl = document.getElementById('q-ans-file-url')?.value || null;
+
+      const qFile = document.getElementById('q-file-picker')?.files[0];
+      if (qFile && !questionDataUrl) {
+        showToast(`Uploading question attachment ${qFile.name}...`, 'info');
+        const qUploaded = await uploadFileHelper(qFile);
+        questionDataUrl = qUploaded.url;
+      }
+
+      const qAnsFile = document.getElementById('q-ans-file-picker')?.files[0];
+      if (qAnsFile && !answerFileUrl) {
+        showToast(`Uploading answer key attachment ${qAnsFile.name}...`, 'info');
+        const ansUploaded = await uploadFileHelper(qAnsFile);
+        answerFileUrl = ansUploaded.url;
+      }
+
       await apiFetch(`/homework/${homeworkId}/questions`, {
         method: 'POST',
         body: JSON.stringify({
           question_type: document.getElementById('q-type').value,
-          question_text: document.getElementById('q-text').value,
+          question_text: qText,
+          question_data: questionDataUrl,
           points: document.getElementById('q-points').value,
           order_number: document.getElementById('q-order').value,
-          answer_text: document.getElementById('q-ans-text').value
+          answer_text: document.getElementById('q-ans-text').value,
+          answer_file_url: answerFileUrl
         })
       });
       addQModal.classList.remove('active');
       document.getElementById('add-q-form').reset();
+      clearDropzoneAttachment('q-file-url', 'q-file-status');
+      clearDropzoneAttachment('q-ans-file-url', 'q-ans-file-status');
+      showToast('Question added to homework set!', 'success');
       loadHomeworkDetails();
     } catch (err) {
-      showAlert(err.message, 'error');
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+      showToast(err.message, 'error');
     }
   };
 
@@ -297,11 +639,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderCodeWithLineNumbers(code) {
-    if (!code) return 'No code content';
+    if (!code) return 'No content provided';
     const lines = code.split('\n');
     return lines.map((line, idx) => `
-      <div class="code-line">
-        <span class="line-num">${idx + 1}</span>
+      <div class="flex gap-3 text-xs leading-relaxed">
+        <span class="text-slate-500 font-mono select-none w-6 text-right shrink-0">${idx + 1}</span>
         <span>${escapeHtml(line)}</span>
       </div>
     `).join('');

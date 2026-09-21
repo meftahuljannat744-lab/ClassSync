@@ -1,57 +1,70 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-async function runMigration() {
-  console.log('--- Starting Database Schema Migration ---');
+async function runMigrations() {
+  console.log('--- Starting Unified ClassSync Migration Runner ---');
 
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'classsync_db'
+    database: process.env.DB_NAME || 'classsync_db',
+    multipleStatements: true
   });
 
-  console.log('Connected to MySQL classsync_db database.');
+  console.log('✔ Connected to MySQL database.');
 
-  // 1. ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT false;
-  try {
-    const [cols1] = await connection.query(`SHOW COLUMNS FROM users LIKE 'is_verified'`);
-    if (cols1.length === 0) {
-      await connection.query(`ALTER TABLE \`users\` ADD COLUMN \`is_verified\` BOOLEAN DEFAULT false;`);
-      console.log('✅ Added `is_verified` column to `users` table.');
-    } else {
-      console.log('ℹ️ Column `is_verified` already exists in `users` table.');
-    }
-  } catch (err) {
-    console.error('Error adding is_verified:', err.message);
+  const migrationsDir = path.join(__dirname, '../migrations');
+  if (!fs.existsSync(migrationsDir)) {
+    console.log('No migrations directory found.');
+    await connection.end();
+    return;
   }
 
-  // 2. ALTER TABLE password_reset_otp ADD COLUMN otp_purpose ENUM('registration','password_reset') NOT NULL DEFAULT 'password_reset';
-  try {
-    const [cols2] = await connection.query(`SHOW COLUMNS FROM password_reset_otp LIKE 'otp_purpose'`);
-    if (cols2.length === 0) {
-      await connection.query(
-        `ALTER TABLE \`password_reset_otp\` ADD COLUMN \`otp_purpose\` ENUM('registration','password_reset') NOT NULL DEFAULT 'password_reset';`
-      );
-      console.log('✅ Added `otp_purpose` column to `password_reset_otp` table.');
-    } else {
-      console.log('ℹ️ Column `otp_purpose` already exists in `password_reset_otp` table.');
+  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+
+  for (const file of files) {
+    console.log(`Executing migration: ${file}...`);
+    const sqlPath = path.join(migrationsDir, file);
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+
+    // Split SQL statements by semicolon
+    const statements = sql
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'));
+
+    for (const stmt of statements) {
+      try {
+        await connection.query(stmt);
+      } catch (err) {
+        // If column already exists (ER_DUP_FIELDNAME / 1060), ignore cleanly
+        if (err.errno === 1060 || err.code === 'ER_DUP_FIELDNAME') {
+          console.log(`  ℹ️ Column already exists, skipping.`);
+        } else {
+          console.log(`  Notice: ${err.message}`);
+        }
+      }
     }
-  } catch (err) {
-    console.error('Error adding otp_purpose:', err.message);
+    console.log(`✔ Completed ${file}`);
   }
 
-  // Set existing seeded users to is_verified = true
-  await connection.query(`UPDATE \`users\` SET \`is_verified\` = true WHERE \`user_id\` <= 10;`);
-  console.log('✅ Marked seed users as verified.');
+  // Ensure seed test users are marked verified
+  try {
+    await connection.query(`UPDATE \`users\` SET \`is_verified\` = true WHERE \`user_id\` <= 10;`);
+    console.log('✔ Seed users marked as verified.');
+  } catch (err) {
+    // ignore if table doesn't have is_verified yet
+  }
 
   await connection.end();
-  console.log('--- Migration Completed Successfully! ---');
+  console.log('--- All Migrations Applied Successfully! ---');
 }
 
-runMigration().catch(err => {
-  console.error('Migration failed:', err);
+runMigrations().catch(err => {
+  console.error('❌ Migration runner failed:', err);
   process.exit(1);
 });

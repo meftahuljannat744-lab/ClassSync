@@ -4,66 +4,73 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Problem Bank - ClassSync</title>
+  <meta name="description" content="Browse categorized practice problems and master solutions in the ClassSync problem repository.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="container">
+  <main class="container">
     <div class="page-header">
       <div>
         <h1 class="page-title" id="prob-bank-title">Classroom Problem Bank</h1>
-        <p class="card-subtitle" id="prob-bank-meta">Categorized practice problems & solution repository</p>
+        <p style="color: var(--text-muted); font-size: 0.9rem;" id="prob-bank-meta">Categorized practice problems & solution repository</p>
       </div>
-      <div style="display:flex; gap:0.5rem;">
-        <a href="#" id="back-to-classroom-btn" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> Back to Classroom</a>
-        <button class="btn btn-primary staff-only" id="open-add-prob-btn" style="display:none;"><i class="fa-solid fa-plus"></i> Add Problem</button>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <a href="#" id="back-to-classroom-btn" class="btn btn-secondary btn-sm">
+          <i class="fa-solid fa-arrow-left"></i> Back to Classroom
+        </a>
+        <button class="btn btn-primary staff-only" id="open-add-prob-btn" style="display:none;">
+          <i class="fa-solid fa-plus"></i> Add Problem
+        </button>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="card" style="margin-bottom: 1.5rem; padding: 0.75rem 1.25rem;">
-      <div style="display:flex; gap:1rem; align-items:center;">
-        <div>
-          <label style="font-size:0.85rem; font-weight:600;">Difficulty Filter:</label>
-          <select id="filter-diff" class="form-control" style="width:auto; display:inline-block;">
-            <option value="">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
+    <div class="card" style="padding: 1.25rem; margin-bottom: 2rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <label for="filter-diff" style="font-weight: 600; font-size: 0.875rem;">Difficulty Filter:</label>
+        <select id="filter-diff" class="form-control" style="width: auto; padding: 0.4rem 0.8rem;">
+          <option value="">All Difficulties</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
       </div>
     </div>
 
     <!-- Categorized Problems Grid -->
     <div id="problems-grouped-container">
-      <p>Loading problems...</p>
+      <!-- Render Skeletons / Problems -->
     </div>
-  </div>
+  </main>
 
   <!-- Add Problem Modal (Instructor/TA) -->
   <div class="modal" id="add-prob-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add Problem to Problem Bank</h3>
+        <h3 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-code"></i> Add Problem to Problem Bank
+        </h3>
         <button class="modal-close" id="close-add-prob-modal">&times;</button>
       </div>
-      <form id="add-prob-form">
+      <form id="add-prob-form" novalidate>
+        <div id="add-prob-error" class="form-error-msg" style="display: none;"></div>
+
         <div class="form-group">
-          <label>Category *</label>
+          <label for="prob-category">Category *</label>
           <input type="text" id="prob-category" class="form-control" placeholder="e.g. SQL Joins, Normalization, Relational Algebra" required>
         </div>
         <div class="form-group">
-          <label>Problem Title *</label>
-          <input type="text" id="prob-title-input" class="form-control" required>
+          <label for="prob-title-input">Problem Title *</label>
+          <input type="text" id="prob-title-input" class="form-control" placeholder="e.g. Find Second Highest Salary" required>
         </div>
         <div class="form-group">
-          <label>Difficulty *</label>
+          <label for="prob-diff">Difficulty Level *</label>
           <select id="prob-diff" class="form-control" required>
             <option value="easy">Easy</option>
             <option value="medium" selected>Medium</option>
@@ -71,11 +78,14 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Problem Description *</label>
-          <textarea id="prob-desc-input" class="form-control" required></textarea>
+          <label for="prob-desc-input">Problem Statement & Requirements *</label>
+          <textarea id="prob-desc-input" class="form-control" style="height: 100px;" placeholder="Enter problem instructions..." required></textarea>
         </div>
-        <div style="text-align: right;">
-          <button type="submit" class="btn btn-primary">Save Problem</button>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" id="cancel-add-prob-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submit-add-prob-btn">
+            <i class="fa-solid fa-check"></i> Save Practice Problem
+          </button>
         </div>
       </form>
     </div>
@@ -85,25 +95,29 @@
   <div class="modal" id="solution-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="sol-prob-title">Problem Solution</h3>
+        <h3 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;" id="sol-prob-title">
+          <i class="fa-solid fa-file-code"></i> Problem Solution
+        </h3>
         <button class="modal-close" id="close-sol-modal">&times;</button>
       </div>
       <div>
-        <div style="margin-bottom:1rem;" id="sol-prob-desc"></div>
+        <div style="font-size: 0.9rem; margin-bottom: 1rem;" id="sol-prob-desc"></div>
 
-        <div style="background:var(--table-head-bg); padding:1rem; border-radius:6px; margin-bottom:1rem; border:1px solid var(--border-color);">
-          <h4>Instructor Solution</h4>
+        <div style="padding: 1rem; border-radius: 12px; background-color: var(--table-head-bg); border: 1px solid var(--border-color); margin-bottom: 1rem;">
+          <h4 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--primary-color); margin-bottom: 0.5rem;">Instructor Master Solution</h4>
           <div class="code-box" id="sol-view-box">No official solution uploaded yet.</div>
         </div>
 
         <!-- Instructor Solution Upsert Form -->
-        <form id="save-solution-form" class="staff-only" style="display:none; border-top:1px solid var(--border-color); padding-top:1rem;">
-          <h4>Update Solution (Instructor Only)</h4>
+        <form id="save-solution-form" class="instructor-only" style="display:none; padding-top: 1rem; border-top: 1px solid var(--border-color);" novalidate>
+          <h4 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Update Master Solution (Instructor Only)</h4>
           <div class="form-group">
-            <textarea id="sol-text-input" class="form-control" placeholder="Enter solution code / explanation..."></textarea>
+            <textarea id="sol-text-input" class="form-control" style="height: 100px;" placeholder="Enter official solution code / explanation..."></textarea>
           </div>
-          <div style="text-align: right;">
-            <button type="submit" class="btn btn-primary btn-sm">Save Official Solution</button>
+          <div style="display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="fa-solid fa-check"></i> Save Official Solution
+            </button>
           </div>
         </form>
       </div>

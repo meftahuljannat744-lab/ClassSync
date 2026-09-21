@@ -14,11 +14,11 @@ const isInstructorOrTA = async (userId, classroomId) => {
 const addResource = async (req, res) => {
   try {
     const classroomId = req.params.id;
-    const { resource_title, resource_url, resource_description } = req.body;
+    const { resource_title, resource_url, resource_description, resource_type } = req.body;
     const userId = req.user.user_id;
 
     if (!resource_title || !resource_url) {
-      return res.status(400).json({ success: false, message: 'Resource title and URL are required' });
+      return res.status(400).json({ success: false, message: 'Resource title and URL/content are required' });
     }
 
     const isStaff = await isInstructorOrTA(userId, classroomId);
@@ -27,9 +27,9 @@ const addResource = async (req, res) => {
     const approvedAt = isStaff ? new Date() : null;
 
     const [result] = await db.query(
-      `INSERT INTO resources (classroom_id, submitted_by, resource_title, resource_url, resource_description, is_approved, approved_by, approved_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [classroomId, userId, resource_title, resource_url, resource_description || '', isApproved, approvedBy, approvedAt]
+      `INSERT INTO resources (classroom_id, submitted_by, resource_title, resource_url, resource_description, resource_type, is_approved, approved_by, approved_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [classroomId, userId, resource_title, resource_url, resource_description || '', resource_type || 'link', isApproved, approvedBy, approvedAt]
     );
 
     res.status(201).json({

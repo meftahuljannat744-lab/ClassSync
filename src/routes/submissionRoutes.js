@@ -6,9 +6,10 @@ const {
   getQuestionSubmissions
 } = require('../controllers/submissionController');
 const { verifyToken } = require('../middleware/auth');
+const { requireClassroomRole } = require('../middleware/rbac');
 
-router.post('/questions/:id/submit', verifyToken, submitQuestionSolution);
-router.get('/homework/:id/matrix', verifyToken, getSubmissionMatrix);
-router.get('/questions/:id/submissions', verifyToken, getQuestionSubmissions);
+router.post('/questions/:id/submit', verifyToken, requireClassroomRole(['learner', 'instructor', 'TA'], 'question'), submitQuestionSolution);
+router.get('/homework/:id/matrix', verifyToken, requireClassroomRole(['instructor', 'TA'], 'homework'), getSubmissionMatrix);
+router.get('/questions/:id/submissions', verifyToken, requireClassroomRole(['instructor', 'TA'], 'question'), getQuestionSubmissions);
 
 module.exports = router;

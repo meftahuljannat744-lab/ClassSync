@@ -4,36 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verify OTP - ClassSync</title>
+  <meta name="description" content="Verify your ClassSync security one-time passcode to complete account registration or password recovery.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="navbar-container"></div>
 
-  <div class="auth-container">
+  <main class="auth-container">
     <div class="card">
       <div style="text-align: center; margin-bottom: 1.5rem;">
-        <h1 style="font-size: 1.5rem; font-weight: 700;">Verify Your Email</h1>
-        <p class="card-subtitle" id="otp-target-email">Enter the 6-digit OTP sent to your email</p>
+        <div style="font-size: 2rem; color: var(--primary-color); margin-bottom: 0.5rem;">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h1 class="page-title">Verify Your Account</h1>
+        <p class="card-subtitle" id="otp-target-email" style="margin-bottom: 0;">Enter the 6-digit OTP code sent to your email</p>
       </div>
 
       <form id="otp-form">
+        <div id="otp-error" class="form-error-msg" style="display: none; margin-bottom: 1rem;"></div>
+
         <div class="form-group">
           <label for="otp-code">6-Digit Verification Code *</label>
-          <input type="text" id="otp-code" class="form-control" placeholder="e.g. 123456" maxlength="6" style="font-size: 1.25rem; letter-spacing: 4px; text-align: center;" required>
+          <input type="text" id="otp-code" class="form-control" style="font-family: var(--font-mono); font-size: 1.3rem; text-align: center; letter-spacing: 8px;" placeholder="123456" maxlength="6" required>
         </div>
         
-        <button type="submit" class="btn btn-primary btn-block" id="otp-btn">Verify OTP & Create Account</button>
+        <button type="submit" class="btn btn-primary btn-block" id="otp-btn" style="padding: 0.75rem;">
+          <i class="fa-solid fa-circle-check"></i> Verify OTP & Activate Account
+        </button>
       </form>
 
-      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem;">
-        Didn't receive code? <a href="/register.html">Try Registering Again</a>
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+        Didn't receive code? <a href="/register.html" style="font-weight: 600;">Resend Registration OTP</a>
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="/js/api.js"></script>
   <script src="/js/navbar.js"></script>

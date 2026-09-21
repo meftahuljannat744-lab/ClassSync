@@ -11,12 +11,15 @@ const computeCodeHash = (text) => {
 const submitQuestionSolution = async (req, res) => {
   try {
     const questionId = req.params.id;
-    const { code_content, file_url, submission_metadata } = req.body;
+    const { code_content, file_url, submission_type, submission_metadata } = req.body;
     const learnerId = req.user.user_id;
 
     if (!code_content && !file_url) {
       return res.status(400).json({ success: false, message: 'Must provide code_content or file_url' });
     }
+
+    const validTypes = ['text', 'link', 'pdf', 'docx', 'pptx'];
+    const subType = validTypes.includes(submission_type) ? submission_type : (file_url ? 'pdf' : 'text');
 
     // Get question & homework deadline
     const [q] = await db.query(
@@ -61,11 +64,12 @@ const submitQuestionSolution = async (req, res) => {
       submissionId = existing[0].submission_id;
       await db.query(
         `UPDATE submissions
-         SET code_hash = ?, code_content = ?, file_url = ?, submitted_at = NOW(),
+         SET submission_type = ?, code_hash = ?, code_content = ?, file_url = ?, submitted_at = NOW(),
              is_late = ?, minutes_late = ?, penalty_applied = ?, is_final = true,
              submission_metadata = ?
          WHERE submission_id = ?`,
         [
+          subType,
           codeHash,
           code_content || null,
           file_url || null,
@@ -78,11 +82,12 @@ const submitQuestionSolution = async (req, res) => {
       );
     } else {
       const [result] = await db.query(
-        `INSERT INTO submissions (question_id, learner_id, code_hash, code_content, file_url, is_late, minutes_late, penalty_applied, is_final, submission_metadata)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, true, ?)`,
+        `INSERT INTO submissions (question_id, learner_id, submission_type, code_hash, code_content, file_url, is_late, minutes_late, penalty_applied, is_final, submission_metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?)`,
         [
           questionId,
           learnerId,
+          subType,
           codeHash,
           code_content || null,
           file_url || null,
@@ -159,8 +164,14 @@ const getSubmissionMatrix = async (req, res) => {
       subMap[`${sub.learner_id}_${sub.question_id}`] = sub;
     }
 
+    // Get published homeworks ordered by creation date for streak check
+    const [allHomeworks] = await db.query(
+      `SELECT homework_id FROM homework WHERE classroom_id = ? AND is_published = true ORDER BY created_at ASC`,
+      [classroomId]
+    );
+
     // Build pivot matrix data
-    const matrix = learners.map(learner => {
+    const matrix = await Promise.all(learners.map(async learner => {
       const questionStatuses = {};
       let totalEarned = 0;
       let totalPossible = 0;
@@ -199,6 +210,31 @@ const getSubmissionMatrix = async (req, res) => {
         }
       }
 
+      // Calculate streak: consecutive homework sets with full marks
+      let streak = 0;
+      const reversedHw = [...allHomeworks].reverse();
+      for (const hwItem of reversedHw) {
+        const [qSum] = await db.query(`SELECT SUM(points) AS max_pts FROM questions WHERE homework_id = ?`, [hwItem.homework_id]);
+        const maxPoints = parseFloat(qSum[0]?.max_pts || 0);
+        if (maxPoints === 0) continue;
+
+        const [eSum] = await db.query(
+          `SELECT SUM(g.score) AS earned_pts
+           FROM submissions s
+           JOIN questions q ON s.question_id = q.question_id
+           JOIN grades g ON s.submission_id = g.submission_id
+           WHERE q.homework_id = ? AND s.learner_id = ? AND g.is_draft = false`,
+          [hwItem.homework_id, learner.user_id]
+        );
+
+        const earnedPoints = parseFloat(eSum[0]?.earned_pts || 0);
+        if (earnedPoints >= maxPoints && maxPoints > 0) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+
       return {
         learner_id: learner.user_id,
         full_name: learner.full_name,
@@ -206,9 +242,10 @@ const getSubmissionMatrix = async (req, res) => {
         total_earned: totalEarned,
         total_possible: totalPossible,
         late_count: lateCount,
+        streak,
         questions: questionStatuses
       };
-    });
+    }));
 
     res.json({
       success: true,
@@ -231,7 +268,7 @@ const getQuestionSubmissions = async (req, res) => {
     const questionId = req.params.id;
 
     const [rows] = await db.query(
-      `SELECT s.submission_id, s.question_id, s.learner_id, u.full_name AS learner_name, u.email AS learner_email,
+      `SELECT s.submission_id, s.question_id, s.learner_id, s.submission_type, u.full_name AS learner_name, u.email AS learner_email,
               s.code_hash, s.code_content, s.file_url, s.submitted_at, s.is_late, s.minutes_late, s.penalty_applied,
               g.grade_id, g.score, g.feedback, g.is_draft, g.graded_at,
               (SELECT COUNT(*) FROM code_reviews cr WHERE cr.submission_id = s.submission_id) AS review_count

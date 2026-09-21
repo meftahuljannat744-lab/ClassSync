@@ -37,7 +37,11 @@ const createLiveSession = async (req, res) => {
 
     const sessionId = result.insertId;
 
-    // Notify learners
+    // Notify enrolled learners with classroom name and scheduled time
+    const [classroomInfo] = await db.query(`SELECT classroom_name FROM classrooms WHERE classroom_id = ?`, [classroomId]);
+    const classroomName = classroomInfo.length > 0 ? classroomInfo[0].classroom_name : 'your classroom';
+    const formattedTime = new Date(scheduled).toLocaleString();
+
     const [members] = await db.query(
       `SELECT user_id FROM classroom_members WHERE classroom_id = ? AND role = 'learner' AND is_active = true`,
       [classroomId]
@@ -47,8 +51,8 @@ const createLiveSession = async (req, res) => {
         m.user_id,
         'live_session',
         'Live Class Scheduled',
-        `A new live class "${session_title}" has been scheduled.`,
-        `/live.html?id=${sessionId}`
+        `Live class "${session_title}" scheduled for ${classroomName} at ${formattedTime}`,
+        `/classroom.html?id=${classroomId}`
       );
     }
 
@@ -138,14 +142,23 @@ const recordAttendanceDuration = async (req, res) => {
     const { duration_minutes } = req.body;
     const learnerId = req.user.user_id;
 
-    const [sessions] = await db.query(`SELECT expected_duration FROM live_sessions WHERE session_id = ?`, [sessionId]);
+    const [sessions] = await db.query(
+      `SELECT ls.expected_duration, c.attendance_threshold_percent
+       FROM live_sessions ls
+       JOIN classrooms c ON ls.classroom_id = c.classroom_id
+       WHERE ls.session_id = ?`,
+      [sessionId]
+    );
     if (sessions.length === 0) return res.status(404).json({ success: false, message: 'Live session not found' });
 
     const expectedDuration = sessions[0].expected_duration || 60;
+    const thresholdPercent = sessions[0].attendance_threshold_percent !== undefined && sessions[0].attendance_threshold_percent !== null
+      ? sessions[0].attendance_threshold_percent
+      : 75;
     const duration = parseInt(duration_minutes || 0, 10);
 
-    // Threshold check: 75% of expected duration
-    const thresholdMinutes = Math.ceil(expectedDuration * 0.75);
+    // Dynamic threshold check based on classroom settings
+    const thresholdMinutes = Math.ceil(expectedDuration * (thresholdPercent / 100));
     const isPresent = duration >= thresholdMinutes;
 
     const [existing] = await db.query(
@@ -226,10 +239,120 @@ const overrideAttendance = async (req, res) => {
   }
 };
 
+// PUT /api/live-sessions/:id/start - Instructor or TA starts live session manually
+const startLiveSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = req.user.user_id;
+
+    const [sessions] = await db.query(
+      `SELECT ls.*, c.classroom_name
+       FROM live_sessions ls
+       JOIN classrooms c ON ls.classroom_id = c.classroom_id
+       WHERE ls.session_id = ?`,
+      [sessionId]
+    );
+
+    if (sessions.length === 0) return res.status(404).json({ success: false, message: 'Live session not found' });
+    const session = sessions[0];
+
+    if (!(await isInstructorOrTA(userId, session.classroom_id))) {
+      return res.status(403).json({ success: false, message: 'Only instructors or TAs can start live sessions' });
+    }
+
+    await db.query(
+      `UPDATE live_sessions
+       SET started_at = NOW(), is_active = true, ended_at = NULL
+       WHERE session_id = ?`,
+      [sessionId]
+    );
+
+    // Notify all enrolled members that class is starting now
+    const [members] = await db.query(
+      `SELECT user_id FROM classroom_members WHERE classroom_id = ? AND is_active = true AND user_id != ?`,
+      [session.classroom_id, userId]
+    );
+
+    for (const m of members) {
+      await createNotification(
+        m.user_id,
+        'live_session',
+        'Live Class Started',
+        `Live class "${session.session_title}" is starting now in ${session.classroom_name}`,
+        `/live.html?id=${sessionId}`
+      );
+    }
+
+    res.json({ success: true, message: 'Live session started successfully' });
+  } catch (error) {
+    console.error('Error starting live session:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// PUT /api/live-sessions/:id/end - Instructor or TA ends live session
+const endLiveSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = req.user.user_id;
+
+    const [sessions] = await db.query(
+      `SELECT classroom_id FROM live_sessions WHERE session_id = ?`,
+      [sessionId]
+    );
+
+    if (sessions.length === 0) return res.status(404).json({ success: false, message: 'Live session not found' });
+
+    if (!(await isInstructorOrTA(userId, sessions[0].classroom_id))) {
+      return res.status(403).json({ success: false, message: 'Only instructors or TAs can end live sessions' });
+    }
+
+    await db.query(
+      `UPDATE live_sessions
+       SET ended_at = NOW(), is_active = false
+       WHERE session_id = ?`,
+      [sessionId]
+    );
+
+    res.json({ success: true, message: 'Live session ended successfully' });
+  } catch (error) {
+    console.error('Error ending live session:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/users/me/active-live-sessions - Fetch all active, un-ended live sessions for current user's enrolled classrooms
+const getActiveLiveSessions = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    const [activeSessions] = await db.query(
+      `SELECT ls.session_id, ls.session_title, ls.jitsi_room_id, ls.started_at,
+              c.classroom_id, c.classroom_name
+       FROM live_sessions ls
+       JOIN classrooms c ON ls.classroom_id = c.classroom_id
+       JOIN classroom_members cm ON c.classroom_id = cm.classroom_id
+       WHERE cm.user_id = ? AND cm.is_active = true
+         AND ls.is_active = true AND ls.ended_at IS NULL AND ls.started_at IS NOT NULL
+       ORDER BY ls.started_at DESC`,
+      [userId]
+    );
+
+    res.json({ success: true, data: activeSessions });
+  } catch (error) {
+    console.error('Error fetching active live sessions:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createLiveSession,
   getClassroomLiveSessions,
   getLiveSessionById,
   recordAttendanceDuration,
-  overrideAttendance
+  overrideAttendance,
+  startLiveSession,
+  endLiveSession,
+  getActiveLiveSessions
 };
+
