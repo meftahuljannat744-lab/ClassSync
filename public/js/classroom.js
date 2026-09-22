@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isStaff) {
           if (isScheduled) {
             actionArea = `
-              <button class="btn btn-accent btn-block" style="margin-top: 1.25rem;" onclick="startLiveSessionItem(${s.session_id})">
+              <button class="btn btn-primary btn-block" style="margin-top: 1.25rem;" onclick="startLiveSessionItem(${s.session_id})">
                 <i class="fa-solid fa-play"></i> Start Now
               </button>
             `;

@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // user_status === 'none' or 'rejected'
         if (isPaid) {
           actionButtonHtml = `
-            <button class="btn btn-accent btn-block" onclick="openPaidEnrollModal(${c.classroom_id}, '${escapeHtml(c.classroom_name)}', '${priceText}')">
+            <button class="btn btn-primary btn-block" onclick="openPaidEnrollModal(${c.classroom_id}, '${escapeHtml(c.classroom_name)}', '${priceText}')">
               <i class="fa-solid fa-credit-card"></i> ${userStatus === 'rejected' ? 'Re-submit Paid Request' : `Request Paid Enrollment (${priceText})`}
             </button>
           `;

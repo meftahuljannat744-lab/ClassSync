@@ -224,7 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isInstructor) {
       html += `
         <div style="text-align: center; margin-top: 1rem; margin-bottom: 2rem;">
-          <button class="btn btn-accent" onclick="document.getElementById('add-q-modal').classList.add('active')">
+          <button class="btn btn-primary" onclick="document.getElementById('add-q-modal').classList.add('active')">
             <i class="fa-solid fa-square-plus"></i> Add Question ${questions.length + 1}
           </button>
         </div>

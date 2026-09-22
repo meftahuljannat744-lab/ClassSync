@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button class="btn btn-outline btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
         ` : `
           <a href="/login.html" class="btn btn-outline btn-sm">Login</a>
-          <a href="/register.html" class="btn btn-accent btn-sm">Register</a>
+          <a href="/register.html" class="btn btn-primary btn-sm">Register</a>
         `}
       </div>
     </nav>

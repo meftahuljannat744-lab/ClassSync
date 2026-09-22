@@ -5,8 +5,8 @@
 :root {
   --primary-color: #1D4ED8;        /* deep blue - primary actions, links, active states */
   --primary-hover: #1E40AF;
-  --accent-color: #D97706;         /* amber - reserved for high-emphasis CTAs */
-  --accent-hover: #B45309;
+  --accent-color: #2563EB;         /* vibrant royal blue - CTAs */
+  --accent-hover: #1D4ED8;
 
   --bg-color: #F8FAFC;
   --card-bg: #FFFFFF;
@@ -37,8 +37,8 @@
 [data-theme="dark"] {
   --primary-color: #60A5FA;
   --primary-hover: #93C5FD;
-  --accent-color: #FBBF24;
-  --accent-hover: #FCD34D;
+  --accent-color: #3B82F6;
+  --accent-hover: #2563EB;
 
   --bg-color: #0B1220;
   --card-bg: #131B2E;
@@ -324,25 +324,25 @@ a:hover {
   color: #fff;
   padding: 0.75rem 1.35rem;
   font-weight: 700;
-  box-shadow: 0 4px 14px 0 rgba(217, 119, 6, 0.42);
+  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
 }
 .btn-accent:hover {
   background: var(--accent-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px 0 rgba(217, 119, 6, 0.65), 0 0 14px rgba(217, 119, 6, 0.4);
+  box-shadow: 0 8px 24px 0 rgba(37, 99, 235, 0.55), 0 0 14px rgba(37, 99, 235, 0.3);
   color: #fff;
   text-decoration: none;
 }
 .btn-accent:active {
   transform: translateY(0);
-  box-shadow: 0 3px 10px 0 rgba(217, 119, 6, 0.5);
+  box-shadow: 0 3px 10px 0 rgba(37, 99, 235, 0.4);
 }
 
 [data-theme="dark"] .btn-accent {
-  box-shadow: 0 4px 16px 0 rgba(251, 191, 36, 0.4);
+  box-shadow: 0 4px 16px 0 rgba(59, 130, 246, 0.35);
 }
 [data-theme="dark"] .btn-accent:hover {
-  box-shadow: 0 8px 26px 0 rgba(251, 191, 36, 0.68), 0 0 16px rgba(251, 191, 36, 0.45);
+  box-shadow: 0 8px 26px 0 rgba(59, 130, 246, 0.6), 0 0 16px rgba(59, 130, 246, 0.35);
 }
 
 .btn-secondary {
