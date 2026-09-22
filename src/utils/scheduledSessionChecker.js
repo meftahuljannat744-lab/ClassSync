@@ -36,7 +36,7 @@ const checkScheduledSessions = async () => {
       console.log(`Auto-triggered scheduled live session ID ${session.session_id} (${session.session_title}).`);
     }
   } catch (err) {
-    console.error('Scheduled session check error:', err);
+    console.warn('Scheduled session check warning:', err.message);
   }
 };
 
