@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       document.getElementById('classroom-title').textContent = classroomData.classroom_name;
       document.getElementById('classroom-role-badge-container').innerHTML = renderRoleBadge(classroomData.user_role);
-      
+
       document.getElementById('classroom-subtitle').innerHTML = `
         ${classroomData.description || 'Active Course Workspace'} &nbsp;|&nbsp; 
         Room: <code>${classroomData.room_number}</code> &nbsp;|&nbsp; 
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         listEl.innerHTML = renderEmptyState({
           icon: 'book-open',
           title: 'No Homework Sets Created',
-          message: isInstructor 
+          message: isInstructor
             ? 'Create your first homework assignment set for this classroom to start evaluating learners.'
             : 'No homework assignments have been published for this classroom yet.',
           actionText: isInstructor ? '<i class="fa-solid fa-square-plus"></i> Create Homework Set' : null,
@@ -108,9 +108,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="card-info">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
               <h4 class="card-title"><a href="/homework.html?id=${hw.homework_id}">${hw.title}</a></h4>
-              ${hw.is_published 
-                ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Published</span>' 
-                : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Draft</span>'}
+              ${hw.is_published
+          ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Published</span>'
+          : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Draft</span>'}
             </div>
             <p class="card-subtitle">${hw.description || 'No description provided.'}</p>
             
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const hwRes = await apiFetch(`/classrooms/${classroomId}/homework`);
-      selectEl.innerHTML = '<option value="">-- Select Homework Set --</option>' + 
+      selectEl.innerHTML = '<option value="">-- Select Homework Set --</option>' +
         hwRes.data.map(h => `<option value="${h.homework_id}">${h.title}</option>`).join('');
 
       selectEl.onchange = async () => {
@@ -202,16 +202,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div style="font-size: 0.8rem; color: var(--text-muted);">${row.email}</div>
                   </td>
                   ${questions.map(q => {
-                    const qData = row.questions[q.question_id];
-                    let badgeClass = qData.status === 'green' ? 'badge-green' : qData.status === 'orange' ? 'badge-yellow' : 'badge-gray';
-                    return `
+          const qData = row.questions[q.question_id];
+          let badgeClass = qData.status === 'green' ? 'badge-green' : qData.status === 'orange' ? 'badge-yellow' : 'badge-gray';
+          return `
                       <td style="text-align: center;">
                         <span class="badge ${badgeClass}">
                           ${qData.label} ${qData.score !== null ? `(${qData.score}pts)` : ''}
                         </span>
                       </td>
                     `;
-                  }).join('')}
+        }).join('')}
                   <td style="text-align: center; font-weight: 700;">${row.total_earned} / ${row.total_possible}</td>
                   <td style="text-align: center; color: var(--text-muted);">${row.late_count}</td>
                 </tr>
@@ -396,9 +396,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </h4>
                 <div style="display: flex; gap: 0.35rem; align-items: center;">
                   ${typeBadge}
-                  ${r.is_approved 
-                    ? '<span class="badge badge-green"><i class="fa-solid fa-check-circle"></i> Approved</span>' 
-                    : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Pending</span>'}
+                  ${r.is_approved
+            ? '<span class="badge badge-green"><i class="fa-solid fa-check-circle"></i> Approved</span>'
+            : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Pending</span>'}
                 </div>
               </div>
               <p class="card-subtitle">${r.resource_description || 'No description provided.'}</p>
@@ -463,15 +463,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td style="color: var(--text-main);">${a.alert_message}</td>
                 <td style="color: var(--text-muted);">${a.instructor_name}</td>
                 <td>
-                  ${a.is_resolved 
-                    ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Resolved</span>' 
-                    : '<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> Active</span>'}
+                  ${a.is_resolved
+          ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Resolved</span>'
+          : '<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> Active</span>'}
                 </td>
                 ${isStaff ? `
                   <td>
-                    ${!a.is_resolved 
-                      ? `<button class="btn btn-outline btn-sm" onclick="resolveAlertItem(${a.alert_id})"><i class="fa-solid fa-check"></i> Mark Resolved</button>` 
-                      : '<span style="color: var(--text-muted);">Resolved</span>'}
+                    ${!a.is_resolved
+            ? `<button class="btn btn-outline btn-sm" onclick="resolveAlertItem(${a.alert_id})"><i class="fa-solid fa-check"></i> Mark Resolved</button>`
+            : '<span style="color: var(--text-muted);">Resolved</span>'}
                   </td>
                 ` : ''}
               </tr>
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         listEl.innerHTML = renderEmptyState({
           icon: 'video',
           title: 'No Live Sessions Scheduled',
-          message: isStaff 
+          message: isStaff
             ? 'Schedule your first live class lecture with interactive video stream and attendance tracking.'
             : 'No live class sessions are currently scheduled.',
           actionText: isStaff ? '<i class="fa-solid fa-video"></i> Schedule Live Session' : null,
@@ -636,9 +636,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <span class="badge badge-red"><i class="fa-solid fa-copy"></i> ${f.similarity_score}% Match</span>
                 </td>
                 <td>
-                  ${f.is_reviewed 
-                    ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Reviewed</span>' 
-                    : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Unreviewed</span>'}
+                  ${f.is_reviewed
+          ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Reviewed</span>'
+          : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Unreviewed</span>'}
                 </td>
               </tr>
             `).join('')}
@@ -717,18 +717,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         </thead>
         <tbody>
           ${filtered.map(s => {
-            let attBadge = '';
-            if (s.attendance_percentage === null) {
-              attBadge = `<span class="badge badge-gray"><i class="fa-solid fa-minus-circle"></i> N/A (No Sessions)</span>`;
-            } else if (s.attendance_percentage >= 80) {
-              attBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-            } else if (s.attendance_percentage >= 50) {
-              attBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-triangle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-            } else {
-              attBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-            }
+      let attBadge = '';
+      if (s.attendance_percentage === null) {
+        attBadge = `<span class="badge badge-gray"><i class="fa-solid fa-minus-circle"></i> N/A (No Sessions)</span>`;
+      } else if (s.attendance_percentage >= 80) {
+        attBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+      } else if (s.attendance_percentage >= 50) {
+        attBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-triangle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+      } else {
+        attBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+      }
 
-            return `
+      return `
               <tr>
                 <td>
                   <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(s.full_name)}</div>
@@ -744,7 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </td>
               </tr>
             `;
-          }).join('')}
+    }).join('')}
         </tbody>
       </table>
     `;
@@ -824,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!messagesBox) return;
 
     try {
-      let endpoint = activeChatChannel.type === 'group' 
+      let endpoint = activeChatChannel.type === 'group'
         ? `/classrooms/${classroomId}/messages`
         : `/classrooms/${classroomId}/dm/${activeChatChannel.targetUserId}`;
 
@@ -983,16 +983,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           </thead>
           <tbody>
             ${requests.map(r => {
-              let statusBadge = '';
-              if (r.status === 'pending') {
-                statusBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
-              } else if (r.status === 'approved') {
-                statusBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Approved</span>`;
-              } else {
-                statusBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`;
-              }
+        let statusBadge = '';
+        if (r.status === 'pending') {
+          statusBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
+        } else if (r.status === 'approved') {
+          statusBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Approved</span>`;
+        } else {
+          statusBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`;
+        }
 
-              return `
+        return `
                 <tr>
                   <td>
                     <div style="font-weight: 700;">${r.student_name}</div>
@@ -1017,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   </td>
                 </tr>
               `;
-            }).join('')}
+      }).join('')}
           </tbody>
         </table>
       `;
@@ -1084,15 +1084,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           </thead>
           <tbody>
             ${submissions.map(s => {
-              const subDate = new Date(s.submitted_at).toLocaleString();
-              const isGraded = s.is_graded;
-              const scoreBadge = isGraded
-                ? `<span class="badge badge-green">${s.score} / ${s.max_score} pts</span>`
-                : `<span class="badge badge-yellow">Ungraded</span>`;
-              const typeBadge = `<span class="badge badge-blue" style="text-transform: uppercase;">${s.submission_type || 'text'}</span>`;
-              const lateBadge = s.is_late ? `<span class="badge badge-red" style="font-size:0.7rem; margin-left:0.3rem;">LATE</span>` : '';
+        const subDate = new Date(s.submitted_at).toLocaleString();
+        const isGraded = s.is_graded;
+        const scoreBadge = isGraded
+          ? `<span class="badge badge-green">${s.score} / ${s.max_score} pts</span>`
+          : `<span class="badge badge-yellow">Ungraded</span>`;
+        const typeBadge = `<span class="badge badge-blue" style="text-transform: uppercase;">${s.submission_type || 'text'}</span>`;
+        const lateBadge = s.is_late ? `<span class="badge badge-red" style="font-size:0.7rem; margin-left:0.3rem;">LATE</span>` : '';
 
-              return `
+        return `
                 <tr>
                   <td>
                     <strong>${escapeHtml(s.learner_name)}</strong>
@@ -1110,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   </td>
                 </tr>
               `;
-            }).join('')}
+      }).join('')}
           </tbody>
         </table>
       `;

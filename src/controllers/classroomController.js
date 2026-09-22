@@ -126,7 +126,7 @@ const searchPublicCourses = async (req, res) => {
 
     const [rows] = await db.query(query, params);
 
-    // If user is logged in, attach user enrollment status for each course
+    // If user is logged in, attach user enrollment status and active alerts for each course
     if (activeUserId && rows.length > 0) {
       const courseIds = rows.map(r => r.classroom_id);
       
@@ -142,6 +142,17 @@ const searchPublicCourses = async (req, res) => {
       );
       const requestMap = new Map(requests.map(r => [r.classroom_id, r.status]));
 
+      const [alerts] = await db.query(
+        `SELECT classroom_id, alert_type FROM learner_alerts 
+         WHERE learner_id = ? AND classroom_id IN (?) AND (is_resolved = 0 OR is_resolved IS FALSE)
+         ORDER BY created_at DESC`,
+        [activeUserId, courseIds]
+      );
+      const alertMap = new Map();
+      alerts.forEach(a => {
+        if (!alertMap.has(a.classroom_id)) alertMap.set(a.classroom_id, a.alert_type);
+      });
+
       rows.forEach(r => {
         if (memberMap.has(r.classroom_id)) {
           r.user_status = 'enrolled';
@@ -151,9 +162,13 @@ const searchPublicCourses = async (req, res) => {
         } else {
           r.user_status = 'none';
         }
+        r.active_alert_type = alertMap.get(r.classroom_id) || null;
       });
     } else {
-      rows.forEach(r => r.user_status = 'none');
+      rows.forEach(r => {
+        r.user_status = 'none';
+        r.active_alert_type = null;
+      });
     }
 
     res.json({ success: true, data: rows });
@@ -513,13 +528,14 @@ const getUserClassrooms = async (req, res) => {
     const [rows] = await db.query(
       `SELECT c.classroom_id, c.classroom_name, c.description, c.room_number, c.room_password,
               c.visibility, c.is_paid, c.price, c.cover_photo_url,
-              c.creator_id, u.full_name AS creator_name, cm.role, cm.joined_at
+              c.creator_id, u.full_name AS creator_name, cm.role, cm.joined_at,
+              (SELECT la.alert_type FROM learner_alerts la WHERE la.classroom_id = c.classroom_id AND la.learner_id = ? AND la.is_resolved = false ORDER BY la.created_at DESC LIMIT 1) AS active_alert_type
        FROM classroom_members cm
        JOIN classrooms c ON cm.classroom_id = c.classroom_id
        JOIN users u ON c.creator_id = u.user_id
        WHERE cm.user_id = ? AND cm.is_active = true AND c.is_active = true
        ORDER BY cm.joined_at DESC`,
-      [user_id]
+      [user_id, user_id]
     );
 
     res.json({ success: true, data: rows });
@@ -562,6 +578,16 @@ const getClassroomById = async (req, res) => {
 
     const currentRole = memberInfo[0].role;
 
+    // Fetch active unresolved alert for current user
+    const [userAlertRows] = await db.query(
+      `SELECT alert_id, alert_type, alert_message, created_at
+       FROM learner_alerts
+       WHERE classroom_id = ? AND learner_id = ? AND (is_resolved = 0 OR is_resolved IS FALSE)
+       ORDER BY created_at DESC LIMIT 1`,
+      [classroomId, user_id]
+    );
+    const active_alert = userAlertRows.length > 0 ? userAlertRows[0] : null;
+
     // Get all members
     const [members] = await db.query(
       `SELECT cm.member_id, cm.user_id, u.full_name, u.email, u.profile_picture_url, cm.role, cm.joined_at
@@ -577,6 +603,7 @@ const getClassroomById = async (req, res) => {
       data: {
         ...rooms[0],
         user_role: currentRole,
+        active_alert,
         members
       }
     });
@@ -664,6 +691,15 @@ const getStudentInfo = async (req, res) => {
           attendance_percentage = Math.round((present / total) * 1000) / 10; // 1 decimal place
         }
 
+        const [alertRows] = await db.query(
+          `SELECT alert_id, alert_type, alert_message, created_at
+           FROM learner_alerts
+           WHERE classroom_id = ? AND learner_id = ? AND (is_resolved = 0 OR is_resolved IS FALSE)
+           ORDER BY created_at DESC LIMIT 1`,
+          [classroomId, learner.user_id]
+        );
+        const active_alert = alertRows.length > 0 ? alertRows[0] : null;
+
         return {
           member_id: learner.member_id,
           user_id: learner.user_id,
@@ -674,7 +710,8 @@ const getStudentInfo = async (req, res) => {
           joined_at: learner.joined_at,
           total_sessions: total,
           present_sessions: present,
-          attendance_percentage
+          attendance_percentage,
+          active_alert
         };
       })
     );

@@ -26,6 +26,14 @@ const createLearnerAlert = async (req, res) => {
       return res.status(400).json({ success: false, message: 'learner_id, alert_type (yellow/red), and alert_message are required' });
     }
 
+    // Auto-resolve any existing active alerts for this learner in this classroom so new alert overwrites previous alerts
+    await db.query(
+      `UPDATE learner_alerts
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = ?
+       WHERE classroom_id = ? AND learner_id = ? AND (is_resolved = false OR is_resolved = 0)`,
+      [instructorId, classroomId, learner_id]
+    );
+
     const [result] = await db.query(
       `INSERT INTO learner_alerts (classroom_id, learner_id, instructor_id, alert_type, alert_message)
        VALUES (?, ?, ?, ?, ?)`,
@@ -91,16 +99,21 @@ const resolveAlert = async (req, res) => {
     const alertId = req.params.id;
     const userId = req.user.user_id;
 
-    const [alertRows] = await db.query(`SELECT classroom_id FROM learner_alerts WHERE alert_id = ?`, [alertId]);
+    const [alertRows] = await db.query(`SELECT classroom_id, learner_id FROM learner_alerts WHERE alert_id = ?`, [alertId]);
     if (alertRows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
 
-    if (!(await isInstructorOrTA(userId, alertRows[0].classroom_id))) {
+    const { classroom_id, learner_id } = alertRows[0];
+
+    if (!(await isInstructorOrTA(userId, classroom_id))) {
       return res.status(403).json({ success: false, message: 'Only instructors or TAs can resolve alerts' });
     }
 
+    // Resolve ALL active alerts for this learner in this classroom
     await db.query(
-      `UPDATE learner_alerts SET is_resolved = true, resolved_at = NOW(), resolved_by = ? WHERE alert_id = ?`,
-      [userId, alertId]
+      `UPDATE learner_alerts
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = ?
+       WHERE classroom_id = ? AND learner_id = ? AND (is_resolved = false OR is_resolved = 0)`,
+      [userId, classroom_id, learner_id]
     );
 
     res.json({ success: true, message: 'Alert resolved' });
@@ -114,4 +127,11 @@ module.exports = {
   createLearnerAlert,
   getClassroomAlerts,
   resolveAlert
+};
+
+module.exports = {
+  createLearnerAlert,
+  getClassroomAlerts,
+  resolveAlert,
+  resolveLearnerAlertsInline
 };
