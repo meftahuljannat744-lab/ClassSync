@@ -105,13 +105,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           <button class="btn btn-outline btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
         ` : `
-          <!-- Mock User Switcher for quick lab testing if not logged in via JWT -->
-          <div class="user-switcher">
-            <label for="active-user-select"><i class="fa-solid fa-user-gear"></i> Test User:</label>
-            <select id="active-user-select">
-              <option value="1">User #1</option>
-            </select>
-          </div>
           <a href="/login.html" class="btn btn-outline btn-sm">Login</a>
           <a href="/register.html" class="btn btn-accent btn-sm">Register</a>
         `}
@@ -133,27 +126,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('theme-toggle-btn').innerHTML = newTheme === 'dark' ? '<i class="fa-solid fa-sun"></i> Light Mode' : '<i class="fa-solid fa-moon"></i> Dark Mode';
   });
 
-  // If not logged in via JWT, fetch test users for user selector
-  if (!token) {
-    const currentUserId = getActiveUserId();
-    try {
-      const res = await apiFetch('/users');
-      const select = document.getElementById('active-user-select');
-      if (select && res.data) {
-        select.innerHTML = res.data.map(u => `
-          <option value="${u.user_id}" ${u.user_id == currentUserId ? 'selected' : ''}>
-            ${u.full_name} (${u.email})
-          </option>
-        `).join('');
+  if (token) {
 
-        select.addEventListener('change', (e) => {
-          setActiveUserId(e.target.value);
-        });
-      }
-    } catch (err) {
-      console.warn('Navbar test user fetch bypassed:', err.message);
-    }
-  } else {
     // Handle Notifications Bell for Logged-In User
     const bellBtn = document.getElementById('bell-btn');
     const dropdown = document.getElementById('notifications-dropdown');
