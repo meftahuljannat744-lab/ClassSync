@@ -1126,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (gradingsSortSelect) gradingsSortSelect.onchange = () => loadGradingsTab();
 
   // TAB 10: Course Settings (Instructor & Learner View)
-  const loadSettingsTab = () => {
+  function loadSettingsTab() {
     if (!classroomData) return;
 
     document.getElementById('settings-name').value = classroomData.classroom_name || '';
@@ -1154,7 +1154,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (learnerSettingsCard) {
       learnerSettingsCard.style.display = userRole === 'learner' ? 'block' : 'none';
     }
-  };
+
+    const dangerZoneCard = document.getElementById('danger-zone-card');
+    if (dangerZoneCard) {
+      dangerZoneCard.style.display = userRole === 'instructor' ? 'block' : 'none';
+    }
+  }
 
   const settingsIsPaidSelect = document.getElementById('settings-is-paid');
   if (settingsIsPaidSelect) {
@@ -1577,8 +1582,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (openDeleteCourseBtn) {
     openDeleteCourseBtn.onclick = () => {
-      if (deleteCourseNameDisplay && classroomData) {
-        deleteCourseNameDisplay.textContent = `"${classroomData.classroom_name}"`;
+      const courseTitle = (classroomData && classroomData.classroom_name) || document.getElementById('classroom-title')?.textContent || 'this classroom';
+      if (deleteCourseNameDisplay) {
+        deleteCourseNameDisplay.textContent = `"${courseTitle}"`;
       }
       if (deleteConfirmInput) deleteConfirmInput.value = '';
       if (confirmDeleteCourseBtn) confirmDeleteCourseBtn.disabled = true;
