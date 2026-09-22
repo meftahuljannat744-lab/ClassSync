@@ -1,13 +1,18 @@
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+const getTransporter = () => {
+  const emailUser = (process.env.EMAIL_USER || '').trim();
+  const emailPass = (process.env.EMAIL_PASS || '').replace(/\s+/g, '');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: emailUser,
+      pass: emailPass
+    }
+  });
+};
+
 
 /**
  * Sends OTP Email via Gmail SMTP
@@ -36,12 +41,14 @@ async function sendOTPEmail(toEmail, otpCode, purpose = 'registration') {
   `;
 
   try {
+    const transporter = getTransporter();
     const info = await transporter.sendMail({
-      from: `"ClassSync" <${process.env.EMAIL_USER}>`,
+      from: `"ClassSync" <${(process.env.EMAIL_USER || '').trim()}>`,
       to: toEmail,
       subject: subject,
       html: htmlContent
     });
+
     console.log(`✉️ OTP Email sent successfully to ${toEmail} (MessageId: ${info.messageId})`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
