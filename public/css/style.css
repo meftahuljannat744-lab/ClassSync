@@ -212,9 +212,10 @@ a:hover {
 
 /* Layout & Container */
 .container {
-  max-width: 1200px;
-  margin: 2.5rem auto;
-  padding: 0 2rem;
+  max-width: 1440px;
+  width: 95%;
+  margin: 1.5rem auto;
+  padding: 0 1.25rem;
 }
 
 .auth-container { max-width: 420px; margin: 3rem auto; padding: 0 1rem; }

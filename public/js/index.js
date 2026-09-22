@@ -416,34 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
         joinedGrid.innerHTML = joined.map(c => renderDashboardClassroomCard(c)).join('');
       }
 
-      // Populate heatmap homework selector
-      const homeworkSelectEl = document.getElementById('heatmap-homework-select');
-      if (homeworkSelectEl && classrooms && classrooms.length > 0) {
-        homeworkSelectEl.innerHTML = '<option value="">All Homeworks</option>';
-        for (const c of classrooms) {
-          try {
-            const hwRes = await apiFetch(`/homework/classroom/${c.classroom_id}`);
-            if (hwRes.data && hwRes.data.length > 0) {
-              const optGroup = document.createElement('optgroup');
-              optGroup.label = c.classroom_name;
-              hwRes.data.forEach(hw => {
-                const opt = document.createElement('option');
-                opt.value = hw.homework_id;
-                opt.textContent = hw.title;
-                optGroup.appendChild(opt);
-              });
-              homeworkSelectEl.appendChild(optGroup);
-            }
-          } catch (e) {
-            // silent ignore for homework fetch in dropdown
-          }
-        }
-        homeworkSelectEl.onchange = (e) => {
-          loadHeatmap(e.target.value);
-        };
       }
-
-      loadHeatmap();
     } catch (err) {
       console.error(err);
       instructorGrid.innerHTML = `<div class="card"><p style="color: var(--status-red);">Failed loading classrooms: ${err.message}</p></div>`;

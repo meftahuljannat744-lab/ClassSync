@@ -39,13 +39,15 @@
     <!-- PUBLIC COURSE DISCOVERY SECTION -->
     <section id="section-browse" style="margin-bottom: 2.5rem;">
       <!-- Hero Banner -->
-      <div class="card" style="background: linear-gradient(135deg, rgba(29, 78, 216, 0.08) 0%, rgba(217, 119, 6, 0.05) 100%); border: 1px solid var(--border-color); margin-bottom: 1.75rem; padding: 2rem;">
-        <div style="max-width: 700px;">
-          <span class="badge badge-blue" style="margin-bottom: 0.75rem;"><i class="fa-solid fa-globe"></i> Open Course Catalog</span>
-          <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text-main);">
-            Explore & Enroll in Academic Courses
-          </h1>
-          <p class="card-subtitle" style="font-size: 1rem; margin-bottom: 1.25rem;">
+      <div class="card" style="background: linear-gradient(135deg, rgba(29, 78, 216, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%); border: 1px solid var(--border-color); margin-bottom: 1.25rem; padding: 1.25rem 1.5rem;">
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <h1 style="font-size: 1.4rem; font-weight: 800; color: var(--text-main); margin: 0;">
+              <i class="fa-solid fa-globe" style="color: var(--primary-color); font-size: 1.2rem; margin-right: 0.35rem;"></i> Explore Academic Courses
+            </h1>
+            <span class="badge badge-blue" style="font-size: 0.75rem;"><i class="fa-solid fa-graduation-cap"></i> Open Catalog</span>
+          </div>
+          <p class="card-subtitle" style="font-size: 0.9rem; margin-bottom: 1rem;">
             Browse free public courses or premium paid workshops hosted by verified instructors on ClassSync.
           </p>
 
@@ -72,35 +74,6 @@
 
     <!-- AUTHENTICATED DASHBOARD SECTION (Hidden by default or toggled) -->
     <div id="section-dashboard" style="display: none;">
-      <!-- Submission Activity Heatmap -->
-      <section style="margin-bottom: 2.5rem;" class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div style="font-size: 1.25rem; color: var(--primary-color);">
-              <i class="fa-solid fa-calendar-days"></i>
-            </div>
-            <div>
-              <h2 style="font-size: 1.1rem; font-weight: 700;">Submission Activity Heatmap</h2>
-              <p class="card-subtitle" style="margin: 0;">Daily solution submissions over the last 90 days</p>
-            </div>
-          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-            <select id="heatmap-homework-select" style="font-size: 0.8rem; padding: 0.35rem 0.6rem; border-radius: 6px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;">
-              <option value="">All Homeworks</option>
-            </select>
-            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted);">
-              <span>Less</span>
-              <div style="width: 12px; height: 12px; background: var(--border-color); border-radius: 2px;"></div>
-              <div style="width: 12px; height: 12px; background: #a5b4fc; border-radius: 2px;"></div>
-              <div style="width: 12px; height: 12px; background: #1d4ed8; border-radius: 2px;"></div>
-              <div style="width: 12px; height: 12px; background: #1e3a8a; border-radius: 2px;"></div>
-              <span>More</span>
-            </div>
-          </div>
-        </div>
-        <div id="heatmap-grid" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 0.5rem 0;">
-          <p class="card-subtitle">Loading submission activity...</p>
-        </div>
-      </section>
 
       <!-- Instructor Section -->
       <section style="margin-bottom: 2.5rem;">

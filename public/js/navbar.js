@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
 
           <div class="user-switcher">
-            <span><i class="fa-solid fa-user-circle"></i> <strong>${loggedInUser ? loggedInUser.full_name : 'User'}</strong></span>
+            <span><i class="fa-solid fa-user-circle"></i> <strong>${loggedInUser ? loggedInUser.full_name.replace(/\s*\((Instructor|TA|Learner|Student|Teacher)\)\s*/gi, '').trim() : 'User'}</strong></span>
           </div>
 
           <button class="btn btn-outline btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
