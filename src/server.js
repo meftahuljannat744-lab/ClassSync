@@ -84,9 +84,10 @@ const { startScheduledSessionChecker } = require('./utils/scheduledSessionChecke
 startScheduledSessionChecker();
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
-  console.log(`🚀 ClassSync Server running at http://localhost:${PORT}`);
+  console.log(`🚀 ClassSync Server running at http://0.0.0.0:${PORT}`);
   console.log(`====================================================`);
 });
+
 
