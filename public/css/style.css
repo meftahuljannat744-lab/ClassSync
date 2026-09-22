@@ -415,6 +415,42 @@ a:hover {
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
 }
 
+/* Password Input Eye Toggle */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper .form-control {
+  padding-right: 2.75rem !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.05rem;
+  padding: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s, background-color 0.2s;
+  z-index: 5;
+}
+
+.password-toggle-btn:hover {
+  color: var(--primary-color);
+  background-color: var(--table-head-bg);
+}
+
 .form-error-msg {
   font-size: 0.75rem;
   font-weight: 600;
@@ -422,6 +458,7 @@ a:hover {
   margin-top: 0.4rem;
   display: block;
 }
+
 
 /* Cards & Grid */
 .grid {

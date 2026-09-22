@@ -230,3 +230,50 @@ async function uploadFileHelper(file) {
   });
 }
 
+// Universal Password Eye Toggle Helper
+function setupPasswordToggle() {
+  const passwordInputs = document.querySelectorAll('input[type="password"], input[data-is-password="true"]');
+  passwordInputs.forEach(input => {
+    if (input.dataset.hasEye === 'true') return;
+    input.dataset.hasEye = 'true';
+
+    let wrapper = input.parentElement;
+    if (!wrapper || !wrapper.classList.contains('password-input-wrapper')) {
+      const newWrapper = document.createElement('div');
+      newWrapper.className = 'password-input-wrapper';
+      input.parentNode.insertBefore(newWrapper, input);
+      newWrapper.appendChild(input);
+      wrapper = newWrapper;
+    }
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'password-toggle-btn';
+    toggleBtn.title = 'Toggle password visibility';
+    toggleBtn.innerHTML = '<i class="fa-solid fa-eye"></i>';
+
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isPass = input.type === 'password';
+      input.type = isPass ? 'text' : 'password';
+      toggleBtn.innerHTML = isPass ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+      toggleBtn.style.color = isPass ? 'var(--primary-color)' : 'var(--text-muted)';
+    });
+
+    wrapper.appendChild(toggleBtn);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupPasswordToggle);
+} else {
+  setupPasswordToggle();
+}
+
+if (typeof MutationObserver !== 'undefined') {
+  const observer = new MutationObserver(() => setupPasswordToggle());
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+
