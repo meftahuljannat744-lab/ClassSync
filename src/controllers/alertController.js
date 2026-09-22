@@ -128,10 +128,3 @@ module.exports = {
   getClassroomAlerts,
   resolveAlert
 };
-
-module.exports = {
-  createLearnerAlert,
-  getClassroomAlerts,
-  resolveAlert,
-  resolveLearnerAlertsInline
-};
