@@ -1,3 +1,5 @@
+const nodemailer = require('nodemailer');
+
 const getTransporter = () => {
   const emailUser = (process.env.EMAIL_USER || '').trim();
   const emailPass = (process.env.EMAIL_PASS || '').replace(/\s+/g, '');

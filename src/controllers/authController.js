@@ -53,13 +53,23 @@ const register = async (req, res) => {
     );
 
     // Send OTP via Nodemailer Email
-    await sendOTPEmail(cleanEmail, otpCode, 'registration');
+    const mailResult = await sendOTPEmail(cleanEmail, otpCode, 'registration');
+    if (!mailResult.success) {
+      const errorMsg = !process.env.EMAIL_USER
+        ? 'Email service is not configured (EMAIL_USER missing on server).'
+        : `Email delivery failed: ${mailResult.error || 'SMTP Error'}`;
+      return res.status(500).json({
+        success: false,
+        message: errorMsg
+      });
+    }
 
     res.json({
       success: true,
       message: `OTP sent to ${cleanEmail}. Please verify within 10 minutes to complete registration.`,
       email: cleanEmail
     });
+
   } catch (error) {
     console.error('Error during registration request:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -241,13 +251,23 @@ const forgotPassword = async (req, res) => {
     );
 
     // Send email
-    await sendOTPEmail(cleanEmail, otpCode, 'password_reset');
+    const mailResult = await sendOTPEmail(cleanEmail, otpCode, 'password_reset');
+    if (!mailResult.success) {
+      const errorMsg = !process.env.EMAIL_USER
+        ? 'Email service is not configured (EMAIL_USER missing on server).'
+        : `Email delivery failed: ${mailResult.error || 'SMTP Error'}`;
+      return res.status(500).json({
+        success: false,
+        message: errorMsg
+      });
+    }
 
     res.json({
       success: true,
       message: `Password reset verification code sent to ${cleanEmail}`,
       email: cleanEmail
     });
+
   } catch (error) {
     console.error('Error during forgot password:', error);
     res.status(500).json({ success: false, message: error.message });
