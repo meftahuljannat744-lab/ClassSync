@@ -1,7 +1,5 @@
-CREATE DATABASE IF NOT EXISTS `classsync_db`;
-USE `classsync_db`;
-
 DROP TABLE IF EXISTS `plagiarism_flags`;
+
 DROP TABLE IF EXISTS `attendance`;
 DROP TABLE IF EXISTS `live_sessions`;
 DROP TABLE IF EXISTS `learner_alerts`;
