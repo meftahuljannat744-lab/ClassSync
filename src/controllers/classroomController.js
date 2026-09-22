@@ -432,12 +432,12 @@ const joinClassroom = async (req, res) => {
 
     // Find classroom
     const [rooms] = await db.query(
-      `SELECT classroom_id, classroom_name, room_password FROM classrooms WHERE room_number = ? AND is_active = true`,
+      `SELECT classroom_id, classroom_name, room_password, is_paid, price FROM classrooms WHERE room_number = ? AND is_active = true`,
       [room_number]
     );
 
     if (rooms.length === 0) {
-      return res.status(404).json({ success: false, message: 'Classroom not found' });
+      return res.status(404).json({ success: false, message: 'Classroom not found with this Room Number' });
     }
 
     const classroom = rooms[0];
@@ -458,12 +458,36 @@ const joinClassroom = async (req, res) => {
           `UPDATE classroom_members SET is_active = true WHERE member_id = ?`,
           [existing[0].member_id]
         );
-        return res.json({ success: true, message: 'Re-joined classroom successfully', data: { classroom_id: classroom.classroom_id } });
+        return res.json({ success: true, requires_payment: false, message: 'Re-joined classroom successfully', data: { classroom_id: classroom.classroom_id } });
       }
       return res.status(400).json({ success: false, message: 'You are already a member of this classroom' });
     }
 
-    // Add member as learner
+    // Check if user already submitted a pending payment request for this course
+    const [existingReq] = await db.query(
+      `SELECT request_id, status FROM enrollment_requests WHERE user_id = ? AND classroom_id = ?`,
+      [user_id, classroom.classroom_id]
+    );
+    if (existingReq.length > 0 && existingReq[0].status === 'pending') {
+      return res.status(400).json({ success: false, message: 'You already have a pending enrollment request for this course. Please wait for instructor approval.' });
+    }
+
+    // If private paid course, flag that payment is required
+    if (classroom.is_paid) {
+      return res.json({
+        success: true,
+        requires_payment: true,
+        message: `Room and password verified! "${classroom.classroom_name}" is a paid course (${classroom.price ? 'Tk. ' + classroom.price : 'Paid'}). Please submit your payment details to complete enrollment.`,
+        data: {
+          classroom_id: classroom.classroom_id,
+          classroom_name: classroom.classroom_name,
+          is_paid: true,
+          price: classroom.price
+        }
+      });
+    }
+
+    // Free Private Course -> Directly add member as learner
     await db.query(
       `INSERT INTO classroom_members (user_id, classroom_id, role) VALUES (?, ?, 'learner')`,
       [user_id, classroom.classroom_id]
@@ -471,6 +495,7 @@ const joinClassroom = async (req, res) => {
 
     res.json({
       success: true,
+      requires_payment: false,
       message: `Joined classroom "${classroom.classroom_name}" successfully`,
       data: { classroom_id: classroom.classroom_id }
     });

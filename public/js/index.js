@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderPublicCourseCard = (c) => {
     const isPaid = c.is_paid;
-    const priceText = isPaid ? `$${parseFloat(c.price).toFixed(2)}` : 'FREE';
+    const priceText = isPaid ? `Tk. ${parseFloat(c.price).toFixed(2)}` : 'FREE';
     const priceBadge = isPaid
       ? `<span class="badge badge-yellow" style="font-weight: 700; font-size: 0.85rem;"><i class="fa-solid fa-tag"></i> ${priceText}</span>`
       : `<span class="badge badge-green" style="font-weight: 700; font-size: 0.85rem;"><i class="fa-solid fa-gift"></i> FREE</span>`;
@@ -352,14 +352,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      await apiFetch('/classrooms/join', {
+      const res = await apiFetch('/classrooms/join', {
         method: 'POST',
         body: JSON.stringify({ room_number: roomNum, room_password: roomPass })
       });
       joinModal.classList.remove('active');
       document.getElementById('join-classroom-form').reset();
-      showToast('Joined classroom successfully!', 'success');
-      loadDashboard();
+
+      if (res.requires_payment) {
+        const priceText = res.data.price ? `Tk. ${parseFloat(res.data.price).toFixed(2)}` : 'Paid';
+        openPaidEnrollModal(res.data.classroom_id, res.data.classroom_name, priceText);
+        showToast(res.message || `Room & Password verified! This course is paid (${priceText}). Please submit your payment details.`, 'info');
+      } else {
+        showToast(res.message || 'Joined classroom successfully!', 'success');
+        if (isAuth && dashboardTab && dashboardTab.classList.contains('active')) {
+          loadDashboard();
+        } else {
+          window.location.href = `/classroom.html?id=${res.data.classroom_id}`;
+        }
+      }
     } catch (err) {
       errorBox.textContent = err.message;
       errorBox.style.display = 'block';
