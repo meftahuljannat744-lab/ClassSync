@@ -415,8 +415,6 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         joinedGrid.innerHTML = joined.map(c => renderDashboardClassroomCard(c)).join('');
       }
-
-      }
     } catch (err) {
       console.error(err);
       instructorGrid.innerHTML = `<div class="card"><p style="color: var(--status-red);">Failed loading classrooms: ${err.message}</p></div>`;
