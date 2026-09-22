@@ -730,6 +730,44 @@ const leaveClassroom = async (req, res) => {
   }
 };
 
+// DELETE /api/classrooms/:id - Delete Classroom (Instructor Only)
+const deleteClassroom = async (req, res) => {
+  try {
+    const classroomId = req.params.id;
+    const { confirmation_word } = req.body;
+
+    if (!confirmation_word || confirmation_word.trim().toUpperCase() !== 'DELETE') {
+      return res.status(400).json({ success: false, message: 'Security check failed: You must type DELETE to confirm deletion.' });
+    }
+
+    // Verify classroom exists
+    const [rooms] = await db.query(
+      `SELECT classroom_id, classroom_name FROM classrooms WHERE classroom_id = ? AND is_active = true`,
+      [classroomId]
+    );
+
+    if (rooms.length === 0) {
+      return res.status(404).json({ success: false, message: 'Classroom not found' });
+    }
+
+    const course = rooms[0];
+
+    // Deactivate classroom
+    await db.query(`UPDATE classrooms SET is_active = false WHERE classroom_id = ?`, [classroomId]);
+
+    // Deactivate member rows
+    await db.query(`UPDATE classroom_members SET is_active = false WHERE classroom_id = ?`, [classroomId]);
+
+    res.json({
+      success: true,
+      message: `Classroom "${course.classroom_name}" has been permanently deleted.`
+    });
+  } catch (error) {
+    console.error('Error deleting classroom:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createClassroom,
   updateClassroomSettings,
@@ -744,6 +782,7 @@ module.exports = {
   getClassroomById,
   updateMemberRole,
   getStudentInfo,
-  leaveClassroom
+  leaveClassroom,
+  deleteClassroom
 };
 

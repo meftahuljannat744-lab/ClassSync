@@ -414,6 +414,19 @@
             <i class="fa-solid fa-user-minus"></i> Leave Classroom
           </button>
         </div>
+
+        <!-- Danger Zone: Delete Classroom Card (Instructor Only) -->
+        <div class="card instructor-only" id="danger-zone-card" style="max-width: 680px; margin-top: 2rem; border: 1px solid var(--status-red); background: rgba(220, 38, 38, 0.04); display: none;">
+          <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--status-red); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Danger Zone: Delete Classroom
+          </h4>
+          <p class="card-subtitle" style="margin-bottom: 1.25rem;">
+            Permanently delete this classroom. This action cannot be undone. All student enrollments, assignments, submissions, and messages associated with this course will be archived.
+          </p>
+          <button type="button" class="btn btn-destructive" id="open-delete-course-modal-btn">
+            <i class="fa-solid fa-trash-can"></i> Delete This Classroom
+          </button>
+        </div>
       </div>
     </main>
   </div>
@@ -607,6 +620,33 @@
         <button type="button" class="btn btn-outline" id="cancel-leave-btn">Cancel</button>
         <button type="button" class="btn btn-destructive" id="confirm-leave-btn">
           <i class="fa-solid fa-user-minus"></i> Confirm & Leave
+        </button>
+      </div>
+  <!-- Delete Course Confirmation Modal (With Confirmation Word Check) -->
+  <div class="modal" id="delete-course-modal">
+    <div class="modal-content" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--status-red); display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fa-solid fa-triangle-exclamation"></i> Delete Classroom Permanently
+        </h3>
+        <button class="modal-close" id="close-delete-course-modal">&times;</button>
+      </div>
+      <div style="padding: 1rem 0;">
+        <p style="font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.75rem;">
+          Are you sure you want to delete <strong id="delete-course-name-display" style="color: var(--status-red);">this classroom</strong>?
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          To prevent accidental deletion, please type <strong style="color: var(--status-red); letter-spacing: 1px;">DELETE</strong> in the box below to confirm:
+        </p>
+        <div class="form-group">
+          <input type="text" id="delete-confirm-word-input" class="form-control" placeholder="Type DELETE to enable button" style="text-transform: uppercase;">
+        </div>
+        <div id="delete-course-error" class="form-error-msg" style="display: none; margin-top: 0.5rem;"></div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn btn-outline" id="cancel-delete-course-btn">Cancel</button>
+        <button type="button" class="btn btn-destructive" id="confirm-delete-course-btn" disabled>
+          <i class="fa-solid fa-trash-can"></i> Permanently Delete
         </button>
       </div>
     </div>

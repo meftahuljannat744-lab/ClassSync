@@ -14,7 +14,8 @@ const {
   getClassroomById,
   updateMemberRole,
   getStudentInfo,
-  leaveClassroom
+  leaveClassroom,
+  deleteClassroom
 } = require('../controllers/classroomController');
 const { verifyToken, optionalToken } = require('../middleware/auth');
 const { requireClassroomRole } = require('../middleware/rbac');
@@ -29,6 +30,7 @@ router.post('/classrooms/join', verifyToken, joinClassroom);
 router.get('/classrooms', verifyToken, getUserClassrooms);
 router.get('/classrooms/:id', verifyToken, requireClassroomRole(['instructor', 'TA', 'learner'], 'classroom'), getClassroomById);
 router.delete('/classrooms/:id/leave', verifyToken, requireClassroomRole(['learner'], 'classroom'), leaveClassroom);
+router.delete('/classrooms/:id', verifyToken, requireClassroomRole(['instructor'], 'classroom'), deleteClassroom);
 
 // Student Info & Attendance Roster (Instructor & TA Only)
 router.get('/classrooms/:id/student-info', verifyToken, requireClassroomRole(['instructor', 'TA'], 'classroom'), getStudentInfo);

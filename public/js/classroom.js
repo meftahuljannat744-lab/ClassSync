@@ -1565,6 +1565,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
+  // Delete Classroom Modal & Security Handlers (Instructor Only)
+  const deleteCourseModal = document.getElementById('delete-course-modal');
+  const openDeleteCourseBtn = document.getElementById('open-delete-course-modal-btn');
+  const closeDeleteCourseBtn = document.getElementById('close-delete-course-modal');
+  const cancelDeleteCourseBtn = document.getElementById('cancel-delete-course-btn');
+  const confirmDeleteCourseBtn = document.getElementById('confirm-delete-course-btn');
+  const deleteConfirmInput = document.getElementById('delete-confirm-word-input');
+  const deleteCourseNameDisplay = document.getElementById('delete-course-name-display');
+  const deleteErrorBox = document.getElementById('delete-course-error');
+
+  if (openDeleteCourseBtn) {
+    openDeleteCourseBtn.onclick = () => {
+      if (deleteCourseNameDisplay && classroomData) {
+        deleteCourseNameDisplay.textContent = `"${classroomData.classroom_name}"`;
+      }
+      if (deleteConfirmInput) deleteConfirmInput.value = '';
+      if (confirmDeleteCourseBtn) confirmDeleteCourseBtn.disabled = true;
+      if (deleteErrorBox) deleteErrorBox.style.display = 'none';
+      if (deleteCourseModal) deleteCourseModal.classList.add('active');
+    };
+  }
+
+  if (closeDeleteCourseBtn) closeDeleteCourseBtn.onclick = () => deleteCourseModal.classList.remove('active');
+  if (cancelDeleteCourseBtn) cancelDeleteCourseBtn.onclick = () => deleteCourseModal.classList.remove('active');
+
+  if (deleteConfirmInput && confirmDeleteCourseBtn) {
+    deleteConfirmInput.oninput = () => {
+      const val = deleteConfirmInput.value.trim().toUpperCase();
+      confirmDeleteCourseBtn.disabled = val !== 'DELETE';
+    };
+  }
+
+  if (confirmDeleteCourseBtn) {
+    confirmDeleteCourseBtn.onclick = async () => {
+      const val = deleteConfirmInput ? deleteConfirmInput.value.trim().toUpperCase() : '';
+      if (deleteErrorBox) deleteErrorBox.style.display = 'none';
+
+      if (val !== 'DELETE') {
+        if (deleteErrorBox) {
+          deleteErrorBox.textContent = 'You must type DELETE in all uppercase to confirm.';
+          deleteErrorBox.style.display = 'block';
+        }
+        return;
+      }
+
+      try {
+        await apiFetch(`/classrooms/${classroomId}`, {
+          method: 'DELETE',
+          body: JSON.stringify({ confirmation_word: 'DELETE' })
+        });
+        if (deleteCourseModal) deleteCourseModal.classList.remove('active');
+        showToast('Classroom deleted permanently.', 'success');
+        setTimeout(() => {
+          window.location.href = '/index.html';
+        }, 800);
+      } catch (err) {
+        if (deleteErrorBox) {
+          deleteErrorBox.textContent = err.message;
+          deleteErrorBox.style.display = 'block';
+        }
+        showToast(err.message, 'error');
+      }
+    };
+  }
+
   loadClassroomHeader();
 });
 
