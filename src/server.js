@@ -119,9 +119,9 @@ startScheduledSessionChecker();
 
 
 // Start Server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`🚀 ClassSync Server running at http://0.0.0.0:${PORT}`);
+  console.log(`🚀 ClassSync Server running at http://localhost:${PORT}`);
   console.log(`====================================================`);
 });
 
