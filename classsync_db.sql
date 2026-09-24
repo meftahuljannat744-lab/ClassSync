@@ -274,6 +274,7 @@ CREATE TABLE `homework` (
   `deadline` timestamp NULL DEFAULT NULL,
   `is_published` tinyint(1) DEFAULT 0,
   `published_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deadline_reminder_sent` tinyint(1) DEFAULT 0
