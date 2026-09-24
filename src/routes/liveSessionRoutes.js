@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   createLiveSession,
+  updateLiveSession,
+  deleteLiveSession,
   getClassroomLiveSessions,
   getLiveSessionById,
   recordAttendanceDuration,
@@ -15,6 +17,8 @@ const { requireClassroomRole } = require('../middleware/rbac');
 
 router.get('/users/me/active-live-sessions', verifyToken, getActiveLiveSessions);
 router.post('/classrooms/:id/live-sessions', verifyToken, requireClassroomRole(['instructor', 'TA'], 'classroom'), createLiveSession);
+router.put('/live-sessions/:id', verifyToken, requireClassroomRole(['instructor'], 'live-session'), updateLiveSession);
+router.delete('/live-sessions/:id', verifyToken, requireClassroomRole(['instructor'], 'live-session'), deleteLiveSession);
 router.get('/classrooms/:id/live-sessions', verifyToken, requireClassroomRole(['instructor', 'TA', 'learner'], 'classroom'), getClassroomLiveSessions);
 router.get('/live-sessions/:id', verifyToken, requireClassroomRole(['instructor', 'TA', 'learner'], 'live-session'), getLiveSessionById);
 router.put('/live-sessions/:id/start', verifyToken, requireClassroomRole(['instructor', 'TA'], 'live-session'), startLiveSession);

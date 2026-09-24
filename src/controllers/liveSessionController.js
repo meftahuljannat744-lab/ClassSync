@@ -70,6 +70,92 @@ const createLiveSession = async (req, res) => {
   }
 };
 
+// PUT /api/live-sessions/:id - Update a scheduled live session (creator instructor only)
+const updateLiveSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = req.user.user_id;
+    const { session_title, session_description, scheduled_time, expected_duration } = req.body;
+
+    const [sessions] = await db.query(
+      `SELECT classroom_id, created_by, started_at, ended_at
+       FROM live_sessions
+       WHERE session_id = ? AND is_active = true`,
+      [sessionId]
+    );
+
+    if (sessions.length === 0) return res.status(404).json({ success: false, message: 'Live session not found' });
+    const session = sessions[0];
+
+    if (Number(session.created_by) !== Number(userId)) {
+      return res.status(403).json({ success: false, message: 'Only the instructor who created this session can edit it' });
+    }
+    if (session.started_at || session.ended_at) {
+      return res.status(400).json({ success: false, message: 'Only scheduled sessions can be edited' });
+    }
+    if (!session_title || !session_title.trim()) {
+      return res.status(400).json({ success: false, message: 'Session title is required' });
+    }
+
+    const duration = parseInt(expected_duration, 10);
+    if (!Number.isInteger(duration) || duration < 1) {
+      return res.status(400).json({ success: false, message: 'Expected duration must be at least 1 minute' });
+    }
+
+    const scheduled = scheduled_time ? new Date(scheduled_time) : null;
+    if (!scheduled || Number.isNaN(scheduled.getTime())) {
+      return res.status(400).json({ success: false, message: 'A valid scheduled time is required' });
+    }
+
+    await db.query(
+      `UPDATE live_sessions
+       SET session_title = ?, session_description = ?, scheduled_time = ?, expected_duration = ?
+       WHERE session_id = ? AND is_active = true`,
+      [session_title.trim(), session_description || '', scheduled, duration, sessionId]
+    );
+
+    res.json({ success: true, message: 'Live session updated successfully' });
+  } catch (error) {
+    console.error('Error updating live session:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// DELETE /api/live-sessions/:id - Soft-delete a scheduled live session (creator instructor only)
+const deleteLiveSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = req.user.user_id;
+
+    const [sessions] = await db.query(
+      `SELECT created_by, started_at, ended_at
+       FROM live_sessions
+       WHERE session_id = ? AND is_active = true`,
+      [sessionId]
+    );
+
+    if (sessions.length === 0) return res.status(404).json({ success: false, message: 'Live session not found' });
+    const session = sessions[0];
+
+    if (Number(session.created_by) !== Number(userId)) {
+      return res.status(403).json({ success: false, message: 'Only the instructor who created this session can delete it' });
+    }
+    if (session.started_at || session.ended_at) {
+      return res.status(400).json({ success: false, message: 'Only scheduled sessions can be deleted' });
+    }
+
+    await db.query(
+      `UPDATE live_sessions SET is_active = false WHERE session_id = ? AND is_active = true`,
+      [sessionId]
+    );
+
+    res.json({ success: true, message: 'Live session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting live session:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/classrooms/:id/live-sessions - List live sessions
 const getClassroomLiveSessions = async (req, res) => {
   try {
@@ -347,6 +433,8 @@ const getActiveLiveSessions = async (req, res) => {
 
 module.exports = {
   createLiveSession,
+  updateLiveSession,
+  deleteLiveSession,
   getClassroomLiveSessions,
   getLiveSessionById,
   recordAttendanceDuration,

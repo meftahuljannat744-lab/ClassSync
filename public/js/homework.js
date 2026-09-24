@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let homeworkData = null;
   let activeSubmissionIdForGrading = null;
+  let editingQuestionId = null;
 
   const loadHomeworkDetails = async () => {
     try {
@@ -128,7 +129,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             <h3 class="card-title" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--primary-color);">
               <i class="fa-solid fa-circle-question"></i> Question ${idx + 1} &nbsp;<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">(${q.points} Points)</span>
             </h3>
-            ${typeBadge}
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              ${typeBadge}
+              ${isInstructor ? `<button class="btn btn-outline btn-sm" onclick="openEditQuestionModal(${q.question_id})"><i class="fa-solid fa-pen"></i> Edit Question</button>` : ''}
+            </div>
           </div>
 
           <div style="font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.25rem; font-weight: 500;">
@@ -380,9 +384,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ${s.score !== null ? `${s.score} pts` : '<span class="badge badge-gray">Not Graded</span>'}
                   </td>
                   <td>
-                    <button class="btn btn-primary btn-sm" onclick="openGradeModal(${s.submission_id}, '${escapeHtml(s.learner_name)}', '${escapeHtml(s.code_content || s.file_url || '')}', ${s.score || ''}, '${escapeHtml(s.feedback || '')}')">
-                      <i class="fa-solid fa-pen-ruler"></i> Grade & Review (${s.review_count})
-                    </button>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 150px;">
+                      <button class="btn btn-outline btn-sm" onclick="openSubmissionPreviewModal(${s.submission_id})">
+                        <i class="fa-solid fa-eye"></i> View Answer
+                      </button>
+                      <button class="btn btn-primary btn-sm" onclick="openGradeModal(${s.submission_id})">
+                        <i class="fa-solid fa-pen-ruler"></i> Grade & Review (${s.review_count})
+                      </button>
+                    </div>
                   </td>
                 </tr>
               `).join('')}
@@ -395,6 +404,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  // Submission Preview Modal Logic
+  const submissionViewModal = document.getElementById('submission-view-modal');
+  const closeSubmissionViewBtn = document.getElementById('close-submission-view-modal');
+
+  if (closeSubmissionViewBtn) closeSubmissionViewBtn.onclick = () => submissionViewModal.classList.remove('active');
+
+  window.openSubmissionPreviewModal = async (subId) => {
+    const titleEl = document.getElementById('submission-view-title');
+    const typeEl = document.getElementById('submission-view-type');
+    const contentEl = document.getElementById('submission-view-content');
+
+    try {
+      const res = await apiFetch(`/submissions/${subId}`);
+      const data = res.data || {};
+
+      titleEl.textContent = `Submission by ${data.learner_name || 'Learner'}`;
+      typeEl.textContent = `Format: ${data.submission_type || 'Text'}`;
+
+      if (data.code_content && data.code_content.trim()) {
+        contentEl.innerHTML = renderCodeWithLineNumbers(data.code_content);
+      } else if (data.file_url) {
+        contentEl.innerHTML = `<a href="${data.file_url}" target="_blank" class="btn btn-outline btn-sm"><i class="fa-solid fa-file-arrow-down"></i> Open submitted file</a>`;
+      } else {
+        contentEl.textContent = 'No submitted content available.';
+      }
+
+      submissionViewModal.classList.add('active');
+    } catch (err) {
+      titleEl.textContent = 'Submission Details';
+      typeEl.textContent = 'Format: N/A';
+      contentEl.textContent = err.message;
+      submissionViewModal.classList.add('active');
+    }
+  };
+
   // Grade Modal Logic
   const gradeModal = document.getElementById('grade-modal');
   const closeGradeBtn = document.getElementById('close-grade-modal');
@@ -403,15 +447,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (closeGradeBtn) closeGradeBtn.onclick = () => gradeModal.classList.remove('active');
   if (cancelGradeBtn) cancelGradeBtn.onclick = () => gradeModal.classList.remove('active');
 
-  window.openGradeModal = async (subId, learnerName, codeContent, currentScore, currentFeedback) => {
+  window.openGradeModal = async (subId) => {
     activeSubmissionIdForGrading = subId;
-    document.getElementById('grade-learner-info').textContent = `Learner: ${learnerName}`;
-    document.getElementById('grade-code-view').innerHTML = renderCodeWithLineNumbers(codeContent);
-    document.getElementById('grade-score').value = currentScore || '';
-    document.getElementById('grade-feedback').value = currentFeedback || '';
+    const learnerInfoEl = document.getElementById('grade-learner-info');
+    const codeViewEl = document.getElementById('grade-code-view');
+    const scoreEl = document.getElementById('grade-score');
+    const feedbackEl = document.getElementById('grade-feedback');
 
-    await loadInlineCodeReviews(subId);
+    learnerInfoEl.textContent = 'Loading submission...';
+    codeViewEl.textContent = 'Loading answer...';
+    scoreEl.value = '';
+    feedbackEl.value = '';
     gradeModal.classList.add('active');
+
+    try {
+      const res = await apiFetch(`/submissions/${subId}`);
+      const data = res.data || {};
+      learnerInfoEl.textContent = `Learner: ${data.learner_name || 'Learner'}`;
+      codeViewEl.innerHTML = data.code_content
+        ? renderCodeWithLineNumbers(data.code_content)
+        : (data.file_url ? `<a href="${data.file_url}" target="_blank" class="btn btn-outline btn-sm"><i class="fa-solid fa-file-arrow-down"></i> Open submitted file</a>` : 'No content provided');
+      scoreEl.value = data.score || '';
+      feedbackEl.value = data.feedback || '';
+      await loadInlineCodeReviews(subId);
+    } catch (err) {
+      learnerInfoEl.textContent = 'Submission Details';
+      codeViewEl.textContent = err.message;
+    }
   };
 
   const loadInlineCodeReviews = async (subId) => {
@@ -574,9 +636,63 @@ document.addEventListener('DOMContentLoaded', async () => {
   const closeAddQBtn = document.getElementById('close-add-q-modal');
   const cancelAddQBtn = document.getElementById('cancel-add-q-btn');
 
-  if (openAddQBtn) openAddQBtn.onclick = () => addQModal.classList.add('active');
-  if (closeAddQBtn) closeAddQBtn.onclick = () => addQModal.classList.remove('active');
-  if (cancelAddQBtn) cancelAddQBtn.onclick = () => addQModal.classList.remove('active');
+  const resetQuestionModal = () => {
+    editingQuestionId = null;
+    document.getElementById('add-q-modal-title').textContent = 'Add Question to Homework';
+    document.getElementById('submit-add-q-btn').innerHTML = '<i class="fa-solid fa-check"></i> Add Question';
+    document.getElementById('add-q-form').reset();
+    clearDropzoneAttachment('q-file-url', 'q-file-status');
+    clearDropzoneAttachment('q-ans-file-url', 'q-ans-file-status');
+  };
+
+  if (openAddQBtn) openAddQBtn.onclick = () => {
+    resetQuestionModal();
+    addQModal.classList.add('active');
+  };
+  if (closeAddQBtn) closeAddQBtn.onclick = () => {
+    resetQuestionModal();
+    addQModal.classList.remove('active');
+  };
+  if (cancelAddQBtn) cancelAddQBtn.onclick = () => {
+    resetQuestionModal();
+    addQModal.classList.remove('active');
+  };
+
+  window.openEditQuestionModal = async (questionId) => {
+    const question = homeworkData?.questions?.find(q => Number(q.question_id) === Number(questionId));
+    if (!question) return;
+
+    editingQuestionId = questionId;
+    document.getElementById('add-q-modal-title').textContent = 'Edit Question';
+    document.getElementById('submit-add-q-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    document.getElementById('q-type').value = question.question_type || 'text';
+    document.getElementById('q-text').value = question.question_text || '';
+    document.getElementById('q-points').value = question.points || 10;
+    document.getElementById('q-order').value = question.order_number || 0;
+    document.getElementById('q-file-url').value = question.question_data || '';
+    document.getElementById('q-file-picker').value = '';
+    document.getElementById('q-ans-file-picker').value = '';
+    document.getElementById('q-ans-text').value = '';
+    clearDropzoneAttachment('q-file-url', 'q-file-status');
+    clearDropzoneAttachment('q-ans-file-url', 'q-ans-file-status');
+
+    if (question.question_data) {
+      document.getElementById('q-file-status').innerHTML = `<div class="file-chip"><i class="fa-solid fa-file"></i> Current attachment: <a href="${question.question_data}" target="_blank">Open file</a></div>`;
+    }
+
+    try {
+      const answer = await apiFetch(`/questions/${questionId}/answer`);
+      document.getElementById('q-ans-text').value = answer.data?.answer_text || '';
+      if (answer.data?.answer_file_url) {
+        document.getElementById('q-ans-file-url').value = answer.data.answer_file_url;
+        document.getElementById('q-ans-file-status').innerHTML = `<div class="file-chip"><i class="fa-solid fa-file"></i> Current answer file: <a href="${answer.data.answer_file_url}" target="_blank">Open file</a></div>`;
+      }
+    } catch (err) {
+      if (!err.message.includes('No answer key')) showToast(`Could not load answer key: ${err.message}`, 'error');
+    }
+
+    addQModal.classList.add('active');
+  };
 
   document.getElementById('add-q-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -608,8 +724,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         answerFileUrl = ansUploaded.url;
       }
 
-      await apiFetch(`/homework/${homeworkId}/questions`, {
-        method: 'POST',
+      await apiFetch(editingQuestionId ? `/questions/${editingQuestionId}` : `/homework/${homeworkId}/questions`, {
+        method: editingQuestionId ? 'PUT' : 'POST',
         body: JSON.stringify({
           question_type: document.getElementById('q-type').value,
           question_text: qText,
@@ -622,6 +738,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       addQModal.classList.remove('active');
       document.getElementById('add-q-form').reset();
+      editingQuestionId = null;
+      document.getElementById('add-q-modal-title').textContent = 'Add Question to Homework';
+      document.getElementById('submit-add-q-btn').innerHTML = '<i class="fa-solid fa-check"></i> Add Question';
       clearDropzoneAttachment('q-file-url', 'q-file-status');
       clearDropzoneAttachment('q-ans-file-url', 'q-ans-file-status');
       showToast('Question added to homework set!', 'success');
@@ -641,12 +760,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCodeWithLineNumbers(code) {
     if (!code) return 'No content provided';
     const lines = code.split('\n');
-    return lines.map((line, idx) => `
-      <div class="flex gap-3 text-xs leading-relaxed">
-        <span class="text-slate-500 font-mono select-none w-6 text-right shrink-0">${idx + 1}</span>
-        <span>${escapeHtml(line)}</span>
-      </div>
-    `).join('');
+    return lines.map((line, idx) => `<div class="code-line"><span class="line-num">${idx + 1}</span><span>${escapeHtml(line) || '&nbsp;'}</span></div>`).join('');
   }
 
   loadHomeworkDetails();

@@ -72,6 +72,7 @@ CREATE TABLE `homework` (
   `deadline` timestamp NULL,
   `is_published` boolean DEFAULT false,
   `published_at` timestamp NULL,
+  `is_active` boolean DEFAULT true,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

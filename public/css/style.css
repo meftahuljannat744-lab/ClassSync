@@ -910,6 +910,103 @@ th {
 }
 .code-line { display: flex; gap: 1rem; }
 .line-num { color: #64748b; user-select: none; min-width: 2rem; }
+.submission-view-dialog {
+  max-width: 900px;
+  padding: 1.5rem;
+}
+.submission-view-dialog .modal-header {
+  margin-bottom: 1rem;
+}
+.submission-view-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--table-head-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.submission-view-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.submission-meta-label,
+.submission-answer-hint,
+.submission-view-footer {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.submission-view-meta strong {
+  overflow-wrap: anywhere;
+}
+.submission-format-badge {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  color: var(--primary-color);
+  background: rgba(29, 78, 216, 0.1);
+  border: 1px solid rgba(29, 78, 216, 0.2);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.submission-answer-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.submission-answer-heading i {
+  color: var(--primary-color);
+  margin-right: 0.35rem;
+}
+.submission-answer-box {
+  min-height: 180px;
+  max-height: 480px;
+  overflow: auto;
+  margin-bottom: 0.75rem;
+  padding: 1rem 1.15rem;
+  white-space: normal;
+  line-height: 1.45;
+}
+.submission-answer-box .code-line {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 1rem;
+  min-height: 1.45em;
+  align-items: flex-start;
+  line-height: 1.45;
+  margin: 0;
+  padding: 0.12rem 0;
+}
+.submission-answer-box .code-line > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.submission-view-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.submission-view-footer i {
+  color: var(--primary-color);
+}
+@media (max-width: 600px) {
+  .submission-view-dialog {
+    width: 96%;
+    padding: 1rem;
+  }
+  .submission-view-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 .review-annotation {
   background-color: rgba(217, 119, 6, 0.15);
   border-left: 4px solid var(--status-orange);
