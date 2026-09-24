@@ -287,8 +287,38 @@ const getQuestionSubmissions = async (req, res) => {
   }
 };
 
+// GET /api/submissions/:id - Fetch a single submission for preview/grading
+const getSubmissionById = async (req, res) => {
+  try {
+    const submissionId = req.params.id;
+
+    const [rows] = await db.query(
+      `SELECT s.submission_id, s.question_id, s.learner_id, s.submission_type,
+              u.full_name AS learner_name, u.email AS learner_email,
+              s.code_content, s.file_url, s.submitted_at, s.is_late, s.penalty_applied,
+              s.minutes_late, s.is_final,
+              g.score, g.feedback, g.grade_id
+       FROM submissions s
+       JOIN users u ON s.learner_id = u.user_id
+       LEFT JOIN grades g ON s.submission_id = g.submission_id
+       WHERE s.submission_id = ?`,
+      [submissionId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Submission not found' });
+    }
+
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error fetching submission by ID:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   submitQuestionSolution,
   getSubmissionMatrix,
-  getQuestionSubmissions
+  getQuestionSubmissions,
+  getSubmissionById
 };

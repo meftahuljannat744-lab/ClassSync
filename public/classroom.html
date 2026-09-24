@@ -213,9 +213,14 @@
             <h3 style="font-size: 1.2rem; font-weight: 700;">Plagiarism Code Hash Comparator</h3>
             <p class="card-subtitle" style="margin: 0;">Run code hash scans across learner submissions to detect copying</p>
           </div>
-          <button class="btn btn-primary instructor-only" id="run-plagiarism-btn" style="display: none;">
-            <i class="fa-solid fa-magnifying-glass-chart"></i> Run Plagiarism Scan
-          </button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+            <button class="btn btn-outline instructor-only" id="clear-plagiarism-btn" style="display: none;">
+              <i class="fa-solid fa-trash-can"></i> Clear Previous Results
+            </button>
+            <button class="btn btn-primary instructor-only" id="run-plagiarism-btn" style="display: none;">
+              <i class="fa-solid fa-magnifying-glass-chart"></i> Run Plagiarism Scan
+            </button>
+          </div>
         </div>
         <div id="plagiarism-flags-list" class="table-responsive">
           <!-- Render Plagiarism Table -->

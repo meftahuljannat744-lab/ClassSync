@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const userRole = (classroomData?.user_role || '').toLowerCase();
       const isInstructor = userRole === 'instructor';
+      window.homeworkCache = Object.fromEntries(homeworks.map(homework => [homework.homework_id, homework]));
 
       if (homeworks.length === 0) {
         listEl.innerHTML = renderEmptyState({
@@ -133,6 +134,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${isInstructor ? `
               <button class="btn btn-outline btn-sm" onclick="togglePublish(${hw.homework_id}, ${!hw.is_published})">
                 ${hw.is_published ? '<i class="fa-solid fa-eye-slash"></i> Unpublish' : '<i class="fa-solid fa-paper-plane"></i> Publish'}
+              </button>
+              <button class="btn btn-secondary btn-sm" title="Edit homework" onclick="openEditHomework(${hw.homework_id})">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="btn btn-secondary btn-sm" title="Delete homework" style="border-color: var(--status-red); color: var(--status-red);" onclick="deleteHomeworkItem(${hw.homework_id})">
+                <i class="fa-solid fa-trash"></i>
               </button>
             ` : ''}
           </div>
@@ -494,6 +501,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const userRole = (classroomData.user_role || '').toLowerCase();
       const isStaff = userRole === 'instructor' || userRole === 'ta';
+      const isInstructor = userRole === 'instructor';
+      const currentUserId = Number(getActiveUserId());
+      window.liveSessionCache = Object.fromEntries(sessions.map(session => [session.session_id, session]));
 
       if (sessions.length === 0) {
         listEl.innerHTML = renderEmptyState({
@@ -526,9 +536,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isStaff) {
           if (isScheduled) {
             actionArea = `
-              <button class="btn btn-primary btn-block" style="margin-top: 1.25rem;" onclick="startLiveSessionItem(${s.session_id})">
-                <i class="fa-solid fa-play"></i> Start Now
-              </button>
+              <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="startLiveSessionItem(${s.session_id})">
+                  <i class="fa-solid fa-play"></i> Start Now
+                </button>
+                ${isInstructor && Number(s.created_by) === currentUserId ? `
+                  <button class="btn btn-secondary" title="Edit session" onclick="openEditLiveSession(${s.session_id})">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button class="btn btn-secondary" title="Delete session" style="border-color: var(--status-red); color: var(--status-red);" onclick="deleteLiveSessionItem(${s.session_id})">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                ` : ''}
+              </div>
             `;
           } else if (isLiveNow) {
             actionArea = `
@@ -620,28 +640,40 @@ document.addEventListener('DOMContentLoaded', async () => {
               <th>Learner 1</th>
               <th>Learner 2</th>
               <th>Similarity Match</th>
+              <th>Risk Level</th>
               <th>Review Status</th>
             </tr>
           </thead>
           <tbody>
-            ${flags.map(f => `
-              <tr>
-                <td>
-                  <div style="font-weight: 700;">${f.homework_title}</div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted);">${f.question_text}</div>
-                </td>
-                <td>${f.learner_1_name}</td>
-                <td>${f.learner_2_name}</td>
-                <td>
-                  <span class="badge badge-red"><i class="fa-solid fa-copy"></i> ${f.similarity_score}% Match</span>
-                </td>
-                <td>
-                  ${f.is_reviewed
-          ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Reviewed</span>'
-          : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Unreviewed</span>'}
-                </td>
-              </tr>
-            `).join('')}
+            ${flags.map(f => {
+              const score = Number(f.similarity_score || 0);
+              const isHighRisk = score >= 80;
+              const matchBadgeClass = isHighRisk ? 'badge-red' : 'badge-green';
+              const matchBadgeIcon = isHighRisk ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-check';
+              const riskLabel = isHighRisk ? 'High Risk' : 'Low Risk';
+
+              return `
+                <tr>
+                  <td>
+                    <div style="font-weight: 700;">${escapeHtml(f.homework_title)}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(f.question_text)}</div>
+                  </td>
+                  <td>${escapeHtml(f.learner_1_name)}</td>
+                  <td>${escapeHtml(f.learner_2_name)}</td>
+                  <td>
+                    <span class="badge ${matchBadgeClass}"><i class="${matchBadgeIcon}"></i> ${score.toFixed(2)}% Match</span>
+                  </td>
+                  <td>
+                    <span class="badge ${isHighRisk ? 'badge-red' : 'badge-green'}">${riskLabel}</span>
+                  </td>
+                  <td>
+                    ${f.is_reviewed
+              ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Reviewed</span>'
+              : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Unreviewed</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
       `;
@@ -1235,6 +1267,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  window.deleteHomeworkItem = async (homeworkId) => {
+    if (!confirm('Are you sure you want to delete this homework? Existing learner submissions will be preserved.')) return;
+    try {
+      await apiFetch(`/homework/${homeworkId}`, { method: 'DELETE' });
+      showToast('Homework deleted.', 'success');
+      loadHomeworkTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   window.promptChangeRole = (memberId, name, newRole) => {
     showConfirmModal({
       title: 'Confirm Role Change',
@@ -1281,10 +1324,48 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openHwBtn = document.getElementById('open-create-hw-btn');
   const closeHwBtn = document.getElementById('close-hw-modal');
   const cancelHwBtn = document.getElementById('cancel-hw-btn');
+  let editingHomeworkId = null;
+  const hwModalTitle = hwModal?.querySelector('.modal-header h3');
+  const submitHwBtn = document.getElementById('submit-hw-btn');
+  const hwPublishGroup = document.getElementById('hw-publish')?.closest('.form-group');
 
-  if (openHwBtn) openHwBtn.onclick = () => hwModal.classList.add('active');
+  const resetHomeworkModal = () => {
+    editingHomeworkId = null;
+    document.getElementById('create-hw-form').reset();
+    document.getElementById('hw-points').value = '100';
+    if (hwModalTitle) hwModalTitle.innerHTML = '<i class="fa-solid fa-book-open" style="color: var(--primary-color);"></i> Create Homework Set';
+    if (submitHwBtn) submitHwBtn.innerHTML = '<i class="fa-solid fa-check"></i> Create Homework Set';
+    if (hwPublishGroup) hwPublishGroup.style.display = 'flex';
+    document.getElementById('hw-error').style.display = 'none';
+  };
+
+  if (openHwBtn) openHwBtn.onclick = () => {
+    resetHomeworkModal();
+    hwModal.classList.add('active');
+  };
   if (closeHwBtn) closeHwBtn.onclick = () => hwModal.classList.remove('active');
   if (cancelHwBtn) cancelHwBtn.onclick = () => hwModal.classList.remove('active');
+
+  window.openEditHomework = (homeworkId) => {
+    const homework = window.homeworkCache?.[homeworkId];
+    if (!homework) return;
+    editingHomeworkId = homework.homework_id;
+    document.getElementById('hw-title').value = homework.title || '';
+    document.getElementById('hw-desc').value = homework.description || '';
+    document.getElementById('hw-points').value = homework.total_points || 100;
+    if (homework.deadline) {
+      const deadline = new Date(homework.deadline);
+      deadline.setMinutes(deadline.getMinutes() - deadline.getTimezoneOffset());
+      document.getElementById('hw-deadline').value = deadline.toISOString().slice(0, 16);
+    } else {
+      document.getElementById('hw-deadline').value = '';
+    }
+    if (hwModalTitle) hwModalTitle.innerHTML = '<i class="fa-solid fa-pen" style="color: var(--primary-color);"></i> Edit Homework Set';
+    if (submitHwBtn) submitHwBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    if (hwPublishGroup) hwPublishGroup.style.display = 'none';
+    document.getElementById('hw-error').style.display = 'none';
+    hwModal.classList.add('active');
+  };
 
   document.getElementById('create-hw-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -1299,19 +1380,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      await apiFetch(`/classrooms/${classroomId}/homework`, {
-        method: 'POST',
+      await apiFetch(editingHomeworkId ? `/homework/${editingHomeworkId}` : `/classrooms/${classroomId}/homework`, {
+        method: editingHomeworkId ? 'PUT' : 'POST',
         body: JSON.stringify({
           title,
           description: document.getElementById('hw-desc').value,
           total_points: document.getElementById('hw-points').value,
           deadline: document.getElementById('hw-deadline').value || null,
-          is_published: document.getElementById('hw-publish').checked
+          is_published: editingHomeworkId ? undefined : document.getElementById('hw-publish').checked
         })
       });
       hwModal.classList.remove('active');
-      document.getElementById('create-hw-form').reset();
-      showToast('Homework set created successfully!', 'success');
+      const wasEditing = Boolean(editingHomeworkId);
+      resetHomeworkModal();
+      showToast(wasEditing ? 'Homework updated successfully!' : 'Homework set created successfully!', 'success');
       loadHomeworkTab();
     } catch (err) {
       errorBox.textContent = err.message;
@@ -1491,10 +1573,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openSessionBtn = document.getElementById('open-create-session-btn');
   const closeSessionBtn = document.getElementById('close-session-modal');
   const cancelSessionBtn = document.getElementById('cancel-session-btn');
+  let editingSessionId = null;
+  const sessionModalTitle = sessionModal?.querySelector('.modal-header h3');
+  const submitSessionBtn = document.getElementById('submit-session-btn');
 
-  if (openSessionBtn) openSessionBtn.onclick = () => sessionModal.classList.add('active');
+  const resetSessionModal = () => {
+    editingSessionId = null;
+    document.getElementById('session-form').reset();
+    document.getElementById('session-duration-input').value = '60';
+    if (sessionModalTitle) sessionModalTitle.innerHTML = '<i class="fa-solid fa-video" style="color: var(--primary-color);"></i> Schedule Live Class Session';
+    if (submitSessionBtn) submitSessionBtn.innerHTML = '<i class="fa-solid fa-calendar-check"></i> Schedule Live Session';
+    document.getElementById('session-error').style.display = 'none';
+  };
+
+  if (openSessionBtn) openSessionBtn.onclick = () => {
+    resetSessionModal();
+    sessionModal.classList.add('active');
+  };
   if (closeSessionBtn) closeSessionBtn.onclick = () => sessionModal.classList.remove('active');
   if (cancelSessionBtn) cancelSessionBtn.onclick = () => sessionModal.classList.remove('active');
+
+  window.openEditLiveSession = (sessionId) => {
+    const session = window.liveSessionCache?.[sessionId];
+    if (!session) return;
+    editingSessionId = session.session_id;
+    document.getElementById('session-title-input').value = session.session_title || '';
+    document.getElementById('session-desc-input').value = session.session_description || '';
+    const scheduled = new Date(session.scheduled_time);
+    scheduled.setMinutes(scheduled.getMinutes() - scheduled.getTimezoneOffset());
+    document.getElementById('session-time-input').value = scheduled.toISOString().slice(0, 16);
+    document.getElementById('session-duration-input').value = session.expected_duration || 60;
+    if (sessionModalTitle) sessionModalTitle.innerHTML = '<i class="fa-solid fa-pen" style="color: var(--primary-color);"></i> Edit Live Class Session';
+    if (submitSessionBtn) submitSessionBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    document.getElementById('session-error').style.display = 'none';
+    sessionModal.classList.add('active');
+  };
 
   document.getElementById('session-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -1509,8 +1622,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      await apiFetch(`/classrooms/${classroomId}/live-sessions`, {
-        method: 'POST',
+      await apiFetch(editingSessionId ? `/live-sessions/${editingSessionId}` : `/classrooms/${classroomId}/live-sessions`, {
+        method: editingSessionId ? 'PUT' : 'POST',
         body: JSON.stringify({
           session_title: title,
           session_description: document.getElementById('session-desc-input').value,
@@ -1519,8 +1632,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         })
       });
       sessionModal.classList.remove('active');
-      document.getElementById('session-form').reset();
-      showToast('Live class session scheduled!', 'success');
+      const wasEditing = Boolean(editingSessionId);
+      resetSessionModal();
+      showToast(wasEditing ? 'Live class session updated!' : 'Live class session scheduled!', 'success');
       loadLiveTab();
     } catch (err) {
       errorBox.textContent = err.message;
@@ -1531,6 +1645,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Plagiarism Scan Trigger
   const runPlagBtn = document.getElementById('run-plagiarism-btn');
+  const clearPlagBtn = document.getElementById('clear-plagiarism-btn');
+  if (clearPlagBtn) {
+    clearPlagBtn.onclick = () => {
+      showConfirmModal({
+        title: 'Clear plagiarism results?',
+        message: 'All saved similarity percentages for this classroom will be deleted. You can run a fresh scan afterward.',
+        confirmText: 'Clear Results',
+        confirmClass: 'btn-destructive',
+        onConfirm: async () => {
+          try {
+            const res = await apiFetch(`/classrooms/${classroomId}/plagiarism-flags`, { method: 'DELETE' });
+            showToast(res.message, 'success');
+            loadPlagiarismTab();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      });
+    };
+  }
   if (runPlagBtn) {
     runPlagBtn.onclick = async () => {
       showToast('Running plagiarism code hash scan across classroom submissions...', 'info');
@@ -1654,6 +1788,17 @@ window.endLiveSessionItem = async (sessionId) => {
   try {
     await apiFetch(`/live-sessions/${sessionId}/end`, { method: 'PUT' });
     showToast('Live session ended.', 'info');
+    window.location.reload();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteLiveSessionItem = async (sessionId) => {
+  if (!confirm('Are you sure you want to delete this scheduled live session?')) return;
+  try {
+    await apiFetch(`/live-sessions/${sessionId}`, { method: 'DELETE' });
+    showToast('Live session deleted.', 'success');
     window.location.reload();
   } catch (err) {
     showToast(err.message, 'error');

@@ -11,6 +11,7 @@ async function initDB() {
     port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'classsync_db',
     multipleStatements: true
   });
 
@@ -18,7 +19,9 @@ async function initDB() {
 
   const schemaSql = fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8');
   console.log('Running schema.sql...');
+  await connection.query('SET FOREIGN_KEY_CHECKS = 0');
   await connection.query(schemaSql);
+  await connection.query('SET FOREIGN_KEY_CHECKS = 1');
   console.log('Schema executed successfully.');
 
   const seedSql = fs.readFileSync(path.join(__dirname, '../seed.sql'), 'utf8');

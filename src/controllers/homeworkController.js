@@ -11,6 +11,14 @@ const isInstructorOrTA = async (userId, classroomId) => {
   return rows[0].role === 'instructor' || rows[0].role === 'TA';
 };
 
+const isInstructor = async (userId, classroomId) => {
+  const [rows] = await db.query(
+    `SELECT role FROM classroom_members WHERE user_id = ? AND classroom_id = ? AND is_active = true`,
+    [userId, classroomId]
+  );
+  return rows.length > 0 && rows[0].role === 'instructor';
+};
+
 // POST /api/classrooms/:id/homework - Create homework set
 const createHomework = async (req, res) => {
   try {
@@ -64,6 +72,72 @@ const createHomework = async (req, res) => {
   }
 };
 
+// PUT /api/homework/:id - Edit homework details (creator instructor only)
+const updateHomework = async (req, res) => {
+  try {
+    const homeworkId = req.params.id;
+    const userId = req.user.user_id;
+    const { title, description, total_points, deadline } = req.body;
+
+    const [rows] = await db.query(
+      `SELECT classroom_id FROM homework WHERE homework_id = ? AND is_active = true`,
+      [homeworkId]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Homework not found' });
+    if (!(await isInstructor(userId, rows[0].classroom_id))) {
+      return res.status(403).json({ success: false, message: 'Only classroom instructors can edit homework' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Homework title is required' });
+    }
+
+    const points = parseInt(total_points, 10);
+    if (!Number.isInteger(points) || points < 1) {
+      return res.status(400).json({ success: false, message: 'Total points must be at least 1' });
+    }
+
+    const parsedDeadline = deadline ? new Date(deadline) : null;
+    if (deadline && Number.isNaN(parsedDeadline.getTime())) {
+      return res.status(400).json({ success: false, message: 'A valid deadline is required' });
+    }
+
+    await db.query(
+      `UPDATE homework
+       SET title = ?, description = ?, total_points = ?, deadline = ?
+       WHERE homework_id = ? AND is_active = true`,
+      [title.trim(), description || '', points, parsedDeadline, homeworkId]
+    );
+
+    res.json({ success: true, message: 'Homework updated successfully' });
+  } catch (error) {
+    console.error('Error updating homework:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// DELETE /api/homework/:id - Archive homework (classroom instructor only)
+const deleteHomework = async (req, res) => {
+  try {
+    const homeworkId = req.params.id;
+    const userId = req.user.user_id;
+
+    const [rows] = await db.query(
+      `SELECT classroom_id FROM homework WHERE homework_id = ? AND is_active = true`,
+      [homeworkId]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Homework not found' });
+    if (!(await isInstructor(userId, rows[0].classroom_id))) {
+      return res.status(403).json({ success: false, message: 'Only classroom instructors can delete homework' });
+    }
+
+    await db.query(`UPDATE homework SET is_active = false WHERE homework_id = ?`, [homeworkId]);
+    res.json({ success: true, message: 'Homework deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting homework:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // PUT /api/homework/:id/publish - Toggle publish status
 const togglePublishHomework = async (req, res) => {
   try {
@@ -100,12 +174,12 @@ const getClassroomHomework = async (req, res) => {
     const isStaff = await isInstructorOrTA(userId, classroomId);
 
     let query = `
-      SELECT h.homework_id, h.classroom_id, h.title, h.description, h.total_points, h.deadline,
+      SELECT h.homework_id, h.classroom_id, h.title, h.description, h.total_points, h.deadline, h.created_by,
              h.is_published, h.published_at, h.created_at, u.full_name AS creator_name,
              (SELECT COUNT(*) FROM questions q WHERE q.homework_id = h.homework_id) AS question_count
       FROM homework h
       JOIN users u ON h.created_by = u.user_id
-      WHERE h.classroom_id = ?
+      WHERE h.classroom_id = ? AND h.is_active = true
     `;
 
     if (!isStaff) {
@@ -132,7 +206,7 @@ const getHomeworkById = async (req, res) => {
        FROM homework h
        JOIN classrooms c ON h.classroom_id = c.classroom_id
        JOIN users u ON h.created_by = u.user_id
-       WHERE h.homework_id = ?`,
+      WHERE h.homework_id = ? AND h.is_active = true`,
       [homeworkId]
     );
 
@@ -227,6 +301,54 @@ const addQuestion = async (req, res) => {
   }
 };
 
+// PUT /api/questions/:id - Update an existing question
+const updateQuestion = async (req, res) => {
+  try {
+    const questionId = req.params.id;
+    const { question_type, question_text, question_data, points, order_number, answer_text, answer_file_url } = req.body;
+    const userId = req.user.user_id;
+
+    if (!question_text || !question_text.trim()) {
+      return res.status(400).json({ success: false, message: 'Question text is required' });
+    }
+
+    const [rows] = await db.query(
+      `SELECT q.homework_id, h.classroom_id
+       FROM questions q
+       JOIN homework h ON q.homework_id = h.homework_id
+       WHERE q.question_id = ? AND h.is_active = true`,
+      [questionId]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Question not found' });
+
+    if (!(await isInstructorOrTA(userId, rows[0].classroom_id))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    await db.query(
+      `UPDATE questions
+       SET question_type = ?, question_text = ?, question_data = ?, points = ?, order_number = ?
+       WHERE question_id = ?`,
+      [question_type || 'text', question_text.trim(), question_data || null, points || 10, order_number || 0, questionId]
+    );
+
+    await db.query(
+      `INSERT INTO homework_answers (question_id, instructor_id, answer_text, answer_file_url)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         instructor_id = VALUES(instructor_id),
+         answer_text = VALUES(answer_text),
+         answer_file_url = VALUES(answer_file_url)`,
+      [questionId, userId, answer_text || null, answer_file_url || null]
+    );
+
+    res.json({ success: true, message: 'Question updated successfully' });
+  } catch (error) {
+    console.error('Error updating question:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/questions/:id/answer - Get answer key (learner can ONLY see if they submitted)
 const getQuestionAnswer = async (req, res) => {
   try {
@@ -280,9 +402,12 @@ const getQuestionAnswer = async (req, res) => {
 
 module.exports = {
   createHomework,
+  updateHomework,
+  deleteHomework,
   togglePublishHomework,
   getClassroomHomework,
   getHomeworkById,
   addQuestion,
+  updateQuestion,
   getQuestionAnswer
 };

@@ -54,7 +54,29 @@ async function apiFetch(endpoint, options = {}) {
     headers
   });
 
-  const data = await response.json();
+  const contentType = response.headers.get('content-type') || '';
+  let data;
+
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    data = {};
+  } else if (contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    if (!text) {
+      data = {};
+    } else {
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        const trimmed = text.trim();
+        if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+          throw new Error(`Server returned HTML instead of JSON for ${endpoint}. Check the URL, login state, or backend route.`);
+        }
+        throw new Error(`Unexpected non-JSON response from ${endpoint}: ${trimmed.slice(0, 120)}`);
+      }
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !endpoint.startsWith('/auth/')) {
