@@ -1,5 +1,4 @@
 DROP TABLE IF EXISTS `plagiarism_flags`;
-
 DROP TABLE IF EXISTS `attendance`;
 DROP TABLE IF EXISTS `live_sessions`;
 DROP TABLE IF EXISTS `learner_alerts`;
@@ -13,31 +12,38 @@ DROP TABLE IF EXISTS `grades`;
 DROP TABLE IF EXISTS `submissions`;
 DROP TABLE IF EXISTS `questions`;
 DROP TABLE IF EXISTS `homework`;
+DROP TABLE IF EXISTS `enrollment_requests`;
+DROP TABLE IF EXISTS `classroom_messages`;
+DROP TABLE IF EXISTS `direct_messages`;
 DROP TABLE IF EXISTS `classroom_members`;
 DROP TABLE IF EXISTS `classrooms`;
 DROP TABLE IF EXISTS `password_reset_otp`;
 DROP TABLE IF EXISTS `users`;
 
--- Base Tables Definition (Original Schema)
+-- Base Tables Definition (Full Clean Schema)
 CREATE TABLE `users` (
   `user_id` int PRIMARY KEY AUTO_INCREMENT,
   `email` varchar(255) UNIQUE NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
   `profile_picture_url` varchar(500),
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `phone_number` varchar(20) NULL,
+  `is_verified` boolean DEFAULT false,
   `is_active` boolean DEFAULT true,
-  `last_login` timestamp NULL
+  `last_login` timestamp NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE `password_reset_otp` (
   `otp_id` int PRIMARY KEY AUTO_INCREMENT,
-  `user_id` int NOT NULL,
+  `user_id` int NULL,
   `otp_code` varchar(6) NOT NULL,
+  `otp_purpose` enum('registration','password_reset') NOT NULL DEFAULT 'password_reset',
   `expires_at` timestamp NOT NULL,
   `is_used` boolean DEFAULT false,
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
 );
 
 CREATE TABLE `classrooms` (
@@ -47,9 +53,15 @@ CREATE TABLE `classrooms` (
   `room_password` varchar(255) NOT NULL,
   `classroom_name` varchar(100) NOT NULL,
   `description` text,
+  `visibility` enum('public','private') NOT NULL DEFAULT 'private',
+  `is_paid` boolean DEFAULT false,
+  `price` decimal(10,2) NULL,
+  `cover_photo_url` varchar(500) NULL,
+  `attendance_threshold_percent` int DEFAULT 75,
+  `is_active` boolean DEFAULT true,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_active` boolean DEFAULT true
+  FOREIGN KEY (`creator_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `classroom_members` (
@@ -57,9 +69,50 @@ CREATE TABLE `classroom_members` (
   `user_id` int NOT NULL,
   `classroom_id` int NOT NULL,
   `role` enum('instructor','TA','learner') NOT NULL DEFAULT 'learner',
+  `is_active` boolean DEFAULT true,
   `joined_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_active` boolean DEFAULT true
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`)
+);
+
+CREATE TABLE `enrollment_requests` (
+  `request_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `payment_method` varchar(50),
+  `payer_phone_number` varchar(20),
+  `transaction_id` varchar(100),
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `requested_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `reviewed_by` int NULL,
+  `reviewed_at` timestamp NULL,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
+);
+
+CREATE TABLE `classroom_messages` (
+  `message_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `sender_id` int NOT NULL,
+  `message_text` text NOT NULL,
+  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
+  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`)
+);
+
+CREATE TABLE `direct_messages` (
+  `message_id` int PRIMARY KEY AUTO_INCREMENT,
+  `classroom_id` int NOT NULL,
+  `sender_id` int NOT NULL,
+  `recipient_id` int NOT NULL,
+  `message_text` text NOT NULL,
+  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `is_read` boolean DEFAULT false,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
+  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`),
+  FOREIGN KEY (`recipient_id`) REFERENCES `users`(`user_id`)
 );
 
 CREATE TABLE `homework` (
@@ -72,21 +125,25 @@ CREATE TABLE `homework` (
   `deadline` timestamp NULL,
   `is_published` boolean DEFAULT false,
   `published_at` timestamp NULL,
+  `deadline_reminder_sent` boolean DEFAULT false,
   `is_active` boolean DEFAULT true,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `questions` (
   `question_id` int PRIMARY KEY AUTO_INCREMENT,
   `homework_id` int NOT NULL,
-  `question_type` enum('link','text','pdf','docx','pptx') NOT NULL DEFAULT 'text',
+  `question_type` varchar(50) NOT NULL DEFAULT 'text',
   `question_text` text NOT NULL,
   `question_data` text,
   `points` int DEFAULT 10,
   `order_number` int DEFAULT 0,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`homework_id`) REFERENCES `homework` (`homework_id`)
 );
 
 CREATE TABLE `submissions` (
@@ -102,7 +159,9 @@ CREATE TABLE `submissions` (
   `minutes_late` int DEFAULT 0,
   `penalty_applied` int DEFAULT 0,
   `is_final` boolean DEFAULT true,
-  `submission_metadata` json
+  `submission_metadata` json,
+  FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`),
+  FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `grades` (
@@ -113,7 +172,9 @@ CREATE TABLE `grades` (
   `feedback` text,
   `graded_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_draft` boolean DEFAULT false
+  `is_draft` boolean DEFAULT false,
+  FOREIGN KEY (`submission_id`) REFERENCES `submissions` (`submission_id`),
+  FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `code_reviews` (
@@ -125,7 +186,9 @@ CREATE TABLE `code_reviews` (
   `comment` text NOT NULL,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_resolved` boolean DEFAULT false
+  `is_resolved` boolean DEFAULT false,
+  FOREIGN KEY (`submission_id`) REFERENCES `submissions` (`submission_id`),
+  FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `homework_answers` (
@@ -135,7 +198,9 @@ CREATE TABLE `homework_answers` (
   `answer_text` text,
   `answer_file_url` varchar(500),
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`),
+  FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `problems` (
@@ -146,9 +211,11 @@ CREATE TABLE `problems` (
   `problem_description` text NOT NULL,
   `difficulty` enum('easy','medium','hard') DEFAULT 'medium',
   `created_by` int NOT NULL,
+  `is_active` boolean DEFAULT true,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_active` boolean DEFAULT true
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `problem_answers` (
@@ -158,7 +225,9 @@ CREATE TABLE `problem_answers` (
   `solution_text` text,
   `solution_file_url` varchar(500),
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`problem_id`) REFERENCES `problems` (`problem_id`),
+  FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `resources` (
@@ -168,11 +237,15 @@ CREATE TABLE `resources` (
   `resource_title` varchar(200) NOT NULL,
   `resource_url` varchar(500) NOT NULL,
   `resource_description` text,
+  `resource_type` varchar(50) NOT NULL DEFAULT 'link',
   `is_approved` boolean DEFAULT false,
   `approved_by` int,
   `approved_at` timestamp NULL,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`),
+  FOREIGN KEY (`submitted_by`) REFERENCES `users` (`user_id`),
+  FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `notifications` (
@@ -184,7 +257,8 @@ CREATE TABLE `notifications` (
   `link_url` varchar(500),
   `is_read` boolean DEFAULT false,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `read_at` timestamp NULL
+  `read_at` timestamp NULL,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `learner_alerts` (
@@ -198,7 +272,11 @@ CREATE TABLE `learner_alerts` (
   `resolved_at` timestamp NULL,
   `resolved_by` int,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`),
+  FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`),
+  FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`),
+  FOREIGN KEY (`resolved_by`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `live_sessions` (
@@ -215,7 +293,9 @@ CREATE TABLE `live_sessions` (
   `ended_at` timestamp NULL,
   `recording_url` varchar(500),
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `attendance` (
@@ -229,7 +309,9 @@ CREATE TABLE `attendance` (
   `instructor_override` boolean DEFAULT false,
   `override_present` boolean DEFAULT false,
   `override_reason` varchar(255),
-  `marked_at` timestamp DEFAULT CURRENT_TIMESTAMP
+  `marked_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`session_id`) REFERENCES `live_sessions` (`session_id`),
+  FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`)
 );
 
 CREATE TABLE `plagiarism_flags` (
@@ -243,111 +325,16 @@ CREATE TABLE `plagiarism_flags` (
   `reviewed_at` timestamp NULL,
   `review_notes` text,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`submission_id_1`) REFERENCES `submissions` (`submission_id`),
+  FOREIGN KEY (`submission_id_2`) REFERENCES `submissions` (`submission_id`),
+  FOREIGN KEY (`flagged_by`) REFERENCES `users` (`user_id`),
+  FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `chk_submission_order` CHECK (`submission_id_1` < `submission_id_2`)
 );
 
--- Constraints & Indexes
+-- Constraints & Unique Indexes
 CREATE UNIQUE INDEX `classroom_members_index_0` ON `classroom_members` (`user_id`, `classroom_id`);
 CREATE UNIQUE INDEX `submissions_index_1` ON `submissions` (`question_id`, `learner_id`);
 CREATE UNIQUE INDEX `attendance_index_2` ON `attendance` (`session_id`, `learner_id`);
 CREATE UNIQUE INDEX `plagiarism_flags_index_3` ON `plagiarism_flags` (`submission_id_1`, `submission_id_2`);
-
-ALTER TABLE `password_reset_otp` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `classrooms` ADD FOREIGN KEY (`creator_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `classroom_members` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `classroom_members` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `homework` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `homework` ADD FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `questions` ADD FOREIGN KEY (`homework_id`) REFERENCES `homework` (`homework_id`);
-ALTER TABLE `submissions` ADD FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`);
-ALTER TABLE `submissions` ADD FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `grades` ADD FOREIGN KEY (`submission_id`) REFERENCES `submissions` (`submission_id`);
-ALTER TABLE `grades` ADD FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `code_reviews` ADD FOREIGN KEY (`submission_id`) REFERENCES `submissions` (`submission_id`);
-ALTER TABLE `code_reviews` ADD FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `homework_answers` ADD FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`);
-ALTER TABLE `homework_answers` ADD FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `problems` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `problems` ADD FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `problem_answers` ADD FOREIGN KEY (`problem_id`) REFERENCES `problems` (`problem_id`);
-ALTER TABLE `problem_answers` ADD FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `resources` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `resources` ADD FOREIGN KEY (`submitted_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `notifications` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `learner_alerts` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `learner_alerts` ADD FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `learner_alerts` ADD FOREIGN KEY (`instructor_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `live_sessions` ADD FOREIGN KEY (`classroom_id`) REFERENCES `classrooms` (`classroom_id`);
-ALTER TABLE `live_sessions` ADD FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `attendance` ADD FOREIGN KEY (`session_id`) REFERENCES `live_sessions` (`session_id`);
-ALTER TABLE `attendance` ADD FOREIGN KEY (`learner_id`) REFERENCES `users` (`user_id`);
-ALTER TABLE `plagiarism_flags` ADD FOREIGN KEY (`submission_id_1`) REFERENCES `submissions` (`submission_id`);
-ALTER TABLE `plagiarism_flags` ADD FOREIGN KEY (`submission_id_2`) REFERENCES `submissions` (`submission_id`);
-ALTER TABLE `plagiarism_flags` ADD FOREIGN KEY (`flagged_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `resources` ADD FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `learner_alerts` ADD FOREIGN KEY (`resolved_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `plagiarism_flags` ADD FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`);
-ALTER TABLE `plagiarism_flags` ADD CONSTRAINT `chk_submission_order` CHECK (`submission_id_1` < `submission_id_2`);
-
-
-ALTER TABLE `users` ADD COLUMN `is_verified` BOOLEAN DEFAULT false;
-
-ALTER TABLE `password_reset_otp` ADD COLUMN `otp_purpose` ENUM('registration','password_reset') NOT NULL DEFAULT 'password_reset';
-
-ALTER TABLE `password_reset_otp` MODIFY COLUMN `user_id` INT NULL;
-
-ALTER TABLE `homework` ADD COLUMN `deadline_reminder_sent` BOOLEAN DEFAULT false;
-
--- Part 1: Course Visibility, Monetization & Enrollment Requests Migration
-ALTER TABLE `users` ADD COLUMN `phone_number` VARCHAR(20) NULL;
-
-ALTER TABLE `classrooms` ADD COLUMN `visibility` ENUM('public','private') NOT NULL DEFAULT 'private';
-ALTER TABLE `classrooms` ADD COLUMN `is_paid` BOOLEAN DEFAULT false;
-ALTER TABLE `classrooms` ADD COLUMN `price` DECIMAL(10,2) NULL;
-ALTER TABLE `classrooms` ADD COLUMN `cover_photo_url` VARCHAR(500) NULL;
-
-CREATE TABLE IF NOT EXISTS `enrollment_requests` (
-  `request_id` int PRIMARY KEY AUTO_INCREMENT,
-  `classroom_id` int NOT NULL,
-  `user_id` int NOT NULL,
-  `payment_method` varchar(50),
-  `payer_phone_number` varchar(20),
-  `transaction_id` varchar(100),
-  `status` enum('pending','approved','rejected') DEFAULT 'pending',
-  `requested_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `reviewed_by` int NULL,
-  `reviewed_at` timestamp NULL,
-  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`) ON DELETE CASCADE,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
-  FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
-);
-
--- Migration Part 2: Extended Attachment & File Types (text, link, pdf, pptx, docx)
-ALTER TABLE `resources` ADD COLUMN `resource_type` VARCHAR(50) NOT NULL DEFAULT 'link';
-ALTER TABLE `questions` MODIFY COLUMN `question_type` VARCHAR(50) NOT NULL DEFAULT 'text';
-
--- Migration Part 3: Group Chat & Direct Messaging System
-CREATE TABLE IF NOT EXISTS `classroom_messages` (
-  `message_id` int PRIMARY KEY AUTO_INCREMENT,
-  `classroom_id` int NOT NULL,
-  `sender_id` int NOT NULL,
-  `message_text` text NOT NULL,
-  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
-  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`)
-);
-
-CREATE TABLE IF NOT EXISTS `direct_messages` (
-  `message_id` int PRIMARY KEY AUTO_INCREMENT,
-  `classroom_id` int NOT NULL,
-  `sender_id` int NOT NULL,
-  `recipient_id` int NOT NULL,
-  `message_text` text NOT NULL,
-  `sent_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `is_read` boolean DEFAULT false,
-  FOREIGN KEY (`classroom_id`) REFERENCES `classrooms`(`classroom_id`),
-  FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`),
-  FOREIGN KEY (`recipient_id`) REFERENCES `users`(`user_id`)
-);-- Migration Part 4: Configurable Attendance Threshold
-ALTER TABLE `classrooms` ADD COLUMN `attendance_threshold_percent` INT DEFAULT 75;
-
