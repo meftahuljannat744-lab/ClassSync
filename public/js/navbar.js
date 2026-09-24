@@ -78,10 +78,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         </button>
 
         ${token ? `
-          <a href="/index.html" class="btn btn-outline btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 8px;">
-            <i class="fa-solid fa-gauge"></i> <span>My Dashboard</span>
-          </a>
-
           <div id="navbar-live-btn-container" style="display: none; align-items: center;">
             <a id="navbar-live-btn" href="#" class="btn btn-warning btn-sm pulsing-btn">
               <i class="fa-solid fa-video fa-beat-fade"></i> Join Live Class
