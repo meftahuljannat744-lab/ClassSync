@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
   const token = getAuthToken();
   const isAuth = !!token;
 
@@ -386,11 +386,28 @@ document.addEventListener('DOMContentLoaded', () => {
     joinedGrid.innerHTML = renderSkeletonRows(2);
 
     try {
-      const res = await apiFetch('/classrooms');
-      const classrooms = res.data;
+      // Fetch classrooms + active learner alerts in parallel
+      const [classroomsRes, alertsRes] = await Promise.all([
+        apiFetch('/classrooms'),
+        apiFetch('/me/alerts').catch(() => ({ data: [] })) // graceful fallback
+      ]);
+
+      const classrooms = classroomsRes.data;
+
+      // Build a map: classroom_id => active alert object (for the current user as learner)
+      const alertMap = {};
+      (alertsRes.data || []).forEach(a => {
+        if (!a.is_resolved) {
+          // Keep highest severity (red > yellow) per classroom
+          const existing = alertMap[a.classroom_id];
+          if (!existing || (a.alert_type === 'red' && existing.alert_type !== 'red')) {
+            alertMap[a.classroom_id] = a;
+          }
+        }
+      });
 
       const teaching = classrooms.filter(c => c.role === 'instructor');
-      const joined = classrooms.filter(c => c.role !== 'instructor');
+      const joined   = classrooms.filter(c => c.role !== 'instructor');
 
       if (teaching.length === 0) {
         instructorGrid.innerHTML = renderEmptyState({
@@ -401,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
           actionFn: () => createModal.classList.add('active')
         });
       } else {
-        instructorGrid.innerHTML = teaching.map(c => renderDashboardClassroomCard(c)).join('');
+        instructorGrid.innerHTML = teaching.map(c => renderDashboardClassroomCard(c, null)).join('');
       }
 
       if (joined.length === 0) {
@@ -413,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
           actionFn: () => joinModal.classList.add('active')
         });
       } else {
-        joinedGrid.innerHTML = joined.map(c => renderDashboardClassroomCard(c)).join('');
+        joinedGrid.innerHTML = joined.map(c => renderDashboardClassroomCard(c, alertMap[c.classroom_id] || null)).join('');
       }
     } catch (err) {
       console.error(err);
@@ -422,15 +439,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const renderDashboardClassroomCard = (c) => `
-    <div class="card">
+  const renderDashboardClassroomCard = (c, alert = null) => {
+    const hasAlert      = alert && !alert.is_resolved;
+    const isRedAlert    = hasAlert && alert.alert_type === 'red';
+    const isYellowAlert = hasAlert && alert.alert_type === 'yellow';
+    const glowClass = isRedAlert ? 'card-alert-red' : isYellowAlert ? 'card-alert-yellow' : '';
+
+    const alertBadge = hasAlert ? `
+      <div style="margin-bottom: 0.75rem; padding: 0.55rem 0.85rem; border-radius: 10px;
+           background: ${isRedAlert ? 'rgba(220,38,38,0.08)' : 'rgba(217,119,6,0.08)'};
+           border: 1px solid ${isRedAlert ? 'rgba(220,38,38,0.3)' : 'rgba(217,119,6,0.3)'};
+           display: flex; align-items: flex-start; gap: 0.6rem;">
+        <i class="fa-solid fa-triangle-exclamation" style="color: ${isRedAlert ? 'var(--status-red)' : 'var(--status-orange)'}; margin-top: 0.1rem; flex-shrink: 0;"></i>
+        <div>
+          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: ${isRedAlert ? 'var(--status-red)' : 'var(--status-orange)'}; margin-bottom: 0.15rem;">
+            ${isRedAlert ? 'Red Alert' : 'Yellow Warning'}
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text-main); line-height: 1.35;">${alert.alert_message || ''}</div>
+        </div>
+      </div>
+    ` : '';
+
+    return `
+    <div class="card ${glowClass}">
       <div class="card-info">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
           <h3 class="card-title"><a href="/classroom.html?id=${c.classroom_id}">${c.classroom_name}</a></h3>
           ${renderRoleBadge(c.role)}
         </div>
         <p class="card-subtitle">${c.description || 'No description provided.'}</p>
-        
+        ${alertBadge}
         <div class="card-details">
           <div class="detail-row">
             <strong>Room Number:</strong>
@@ -441,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <code>${c.room_password}</code>
           </div>
           <div class="detail-row">
-            <strong>Visibility & Type:</strong>
+            <strong>Visibility &amp; Type:</strong>
             <span>${(c.visibility || 'private').toUpperCase()} &bull; ${c.is_paid ? `PAID ($${parseFloat(c.price).toFixed(2)})` : 'FREE'}</span>
           </div>
         </div>
@@ -453,10 +491,6 @@ document.addEventListener('DOMContentLoaded', () => {
           Enter Classroom
         </a>
         <div class="secondary-actions">
-          <a href="/problems.html?id=${c.classroom_id}" class="btn btn-outline btn-sm">
-            <i class="fa-solid fa-folder-closed"></i>
-            Problem Bank
-          </a>
           <a href="/leaderboard.html?id=${c.classroom_id}" class="btn btn-outline btn-sm">
             <i class="fa-solid fa-trophy"></i>
             Leaderboard
@@ -465,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
   `;
+  };
 
   // Render Submission Activity Heatmap
   const loadHeatmap = async (homeworkId = '') => {
@@ -507,5 +542,18 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Initial Load
-  loadPublicCourses();
+  if (isAuth) {
+    // Authenticated users start on their Dashboard so alert glow is visible immediately
+    if (dashboardTab && browseTab) {
+      dashboardTab.classList.add('active', 'btn-primary');
+      dashboardTab.classList.remove('btn-outline');
+      browseTab.classList.remove('active', 'btn-primary');
+      browseTab.classList.add('btn-outline');
+      if (sectionDashboard) sectionDashboard.style.display = 'block';
+      if (sectionBrowse) sectionBrowse.style.display = 'none';
+    }
+    loadDashboard();
+  } else {
+    loadPublicCourses();
+  }
 });

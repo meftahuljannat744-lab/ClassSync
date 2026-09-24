@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  document.getElementById('prob-bank-link').href = `/problems.html?id=${classroomId}`;
+  if (document.getElementById('prob-bank-link')) {
+    document.getElementById('prob-bank-link').href = `/problems.html?id=${classroomId}`;
+  }
   document.getElementById('leaderboard-link').href = `/leaderboard.html?id=${classroomId}`;
 
   let classroomData = null;
@@ -90,6 +92,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  // Helper to format remaining time badge for homework cards
+  const renderHomeworkDeadlineBadge = (deadlineStr, isPublished) => {
+    const published = isPublished === true || isPublished === 1 || isPublished === 'true' || isPublished === '1';
+    if (!published) {
+      return `<span class="badge badge-yellow"><i class="fa-solid fa-pen-ruler"></i> Draft</span>`;
+    }
+    if (!deadlineStr) {
+      return `<span class="badge badge-gray"><i class="fa-solid fa-infinity"></i> No Deadline</span>`;
+    }
+
+    const cleanDeadline = typeof deadlineStr === 'string' ? deadlineStr.replace(' ', 'T') : deadlineStr;
+    const targetTime = new Date(cleanDeadline).getTime();
+    if (isNaN(targetTime)) {
+      return `<span class="badge badge-gray"><i class="fa-solid fa-infinity"></i> No Deadline</span>`;
+    }
+
+    const now = new Date().getTime();
+    const diff = targetTime - now;
+
+    if (diff <= 0) {
+      return `<span class="badge badge-red"><i class="fa-solid fa-clock"></i> Overdue</span>`;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    let parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${mins}m`);
+
+    let badgeClass = 'badge-yellow';
+    if (days >= 2) badgeClass = 'badge-green';
+    if (days === 0 && hours < 3) badgeClass = 'badge-red';
+
+    return `
+      <span class="badge ${badgeClass}" style="font-family: var(--font-mono); font-size: 0.775rem;">
+        <i class="fa-solid fa-clock"></i> ${parts.join(' ')} remaining
+      </span>
+    `;
+  };
+
+  let hwCountdownInterval = null;
+  const startHomeworkTabCountdown = () => {
+    if (hwCountdownInterval) clearInterval(hwCountdownInterval);
+    hwCountdownInterval = setInterval(() => {
+      document.querySelectorAll('.hw-deadline-badge-wrap').forEach(wrap => {
+        const deadline = wrap.getAttribute('data-deadline');
+        const published = wrap.getAttribute('data-published');
+        wrap.innerHTML = renderHomeworkDeadlineBadge(deadline, published);
+      });
+    }, 10000);
+  };
+
   // TAB 1: Homework Sets
   const loadHomeworkTab = async () => {
     const listEl = document.getElementById('homework-list');
@@ -120,9 +177,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="card-info">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
               <h4 class="card-title"><a href="/homework.html?id=${hw.homework_id}">${hw.title}</a></h4>
-              ${hw.is_published
-          ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Published</span>'
-          : '<span class="badge badge-yellow"><i class="fa-solid fa-clock"></i> Draft</span>'}
+              <div class="hw-deadline-badge-wrap" data-deadline="${hw.deadline || ''}" data-published="${hw.is_published}">
+                ${renderHomeworkDeadlineBadge(hw.deadline, hw.is_published)}
+              </div>
             </div>
             <p class="card-subtitle">${hw.description || 'No description provided.'}</p>
             
@@ -156,6 +213,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>
       `).join('');
+
+      startHomeworkTabCountdown();
     } catch (err) {
       listEl.innerHTML = `<div class="card"><p style="color: var(--status-red);">Error: ${err.message}</p></div>`;
     }
@@ -695,6 +754,64 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // TAB: Student Info Roster & Attendance (Staff Only)
   let cachedStudentInfoList = [];
+  const editingAlertUserIdMap = {};
+
+  window.toggleInlineAlertEdit = (userId, showEdit) => {
+    editingAlertUserIdMap[userId] = showEdit;
+    renderStudentInfoTable();
+    if (showEdit) {
+      setTimeout(() => {
+        const input = document.getElementById(`alert-reason-input-${userId}`);
+        if (input) input.focus();
+      }, 50);
+    }
+  };
+
+  window.submitInlineAlert = async (userId, alertType) => {
+    const inputEl = document.getElementById(`alert-reason-input-${userId}`);
+    const reasonText = inputEl ? inputEl.value.trim() : '';
+    const finalMsg = reasonText || (alertType === 'red' ? 'Red Warning Alert' : 'Yellow Warning Alert');
+
+    try {
+      await apiFetch(`/classrooms/${classroomId}/alerts`, {
+        method: 'POST',
+        body: JSON.stringify({
+          learner_id: userId,
+          alert_type: alertType,
+          alert_message: finalMsg
+        })
+      });
+
+      editingAlertUserIdMap[userId] = false;
+      showToast(`${alertType.toUpperCase()} alert set for learner!`, 'success');
+      await loadStudentInfoTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  window.clearStudentAlert = async (userId) => {
+    try {
+      const student = cachedStudentInfoList.find(s => Number(s.user_id) === Number(userId));
+      const alertId = student?.active_alert?.alert_id;
+
+      if (alertId) {
+        await apiFetch(`/alerts/${alertId}/resolve`, {
+          method: 'PUT'
+        });
+      } else {
+        await apiFetch(`/classrooms/${classroomId}/learners/${userId}/clear-alerts`, {
+          method: 'PUT'
+        });
+      }
+
+      editingAlertUserIdMap[userId] = false;
+      showToast('Learner alert cleared!', 'success');
+      await loadStudentInfoTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
 
   const loadStudentInfoTab = async () => {
     const container = document.getElementById('student-info-table-container');
@@ -755,23 +872,73 @@ document.addEventListener('DOMContentLoaded', async () => {
             <th>Email</th>
             <th>Phone Number</th>
             <th>Attendance %</th>
-            <th>Quick Actions</th>
+            <th style="min-width: 220px;">Alert</th>
           </tr>
         </thead>
         <tbody>
           ${filtered.map(s => {
-      let attBadge = '';
-      if (s.attendance_percentage === null) {
-        attBadge = `<span class="badge badge-gray"><i class="fa-solid fa-minus-circle"></i> N/A (No Sessions)</span>`;
-      } else if (s.attendance_percentage >= 80) {
-        attBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-      } else if (s.attendance_percentage >= 50) {
-        attBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-triangle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-      } else {
-        attBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
-      }
+            let attBadge = '';
+            if (s.attendance_percentage === null) {
+              attBadge = `<span class="badge badge-gray"><i class="fa-solid fa-minus-circle"></i> N/A (No Sessions)</span>`;
+            } else if (s.attendance_percentage >= 80) {
+              attBadge = `<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+            } else if (s.attendance_percentage >= 50) {
+              attBadge = `<span class="badge badge-yellow"><i class="fa-solid fa-triangle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+            } else {
+              attBadge = `<span class="badge badge-red"><i class="fa-solid fa-circle-exclamation"></i> ${s.attendance_percentage}% (${s.present_sessions}/${s.total_sessions})</span>`;
+            }
 
-      return `
+            const isEditing = editingAlertUserIdMap[s.user_id] === true;
+            const activeAlert = s.active_alert;
+            const hasAlert = activeAlert && (activeAlert.alert_type === 'red' || activeAlert.alert_type === 'yellow');
+
+            let alertCellHtml = '';
+            if (isEditing) {
+              // State 2 (SS 2): Inline Edit Box with Reason Input, Yellow dot, Red dot, and Close button
+              alertCellHtml = `
+                <div class="inline-alert-box">
+                  <input type="text" id="alert-reason-input-${s.user_id}" class="inline-alert-input" placeholder="Reason (optional)" onkeypress="if(event.key==='Enter') submitInlineAlert(${s.user_id}, 'yellow')">
+                  <button type="button" class="btn-inline-dot btn-inline-yellow" title="Set Yellow Warning Alert" onclick="submitInlineAlert(${s.user_id}, 'yellow')">
+                    <span class="dot-icon yellow-dot"></span>
+                  </button>
+                  <button type="button" class="btn-inline-dot btn-inline-red" title="Set Red Warning Alert" onclick="submitInlineAlert(${s.user_id}, 'red')">
+                    <span class="dot-icon red-dot"></span>
+                  </button>
+                  <button type="button" class="btn-inline-cancel" title="Cancel" onclick="toggleInlineAlertEdit(${s.user_id}, false)">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              `;
+            } else if (hasAlert) {
+              // State 3 (SS 3): Alert Active (Red/Yellow Circle Pill + Set + Clear)
+              const isRed = activeAlert.alert_type === 'red';
+              alertCellHtml = `
+                <div class="inline-alert-cell">
+                  <div class="alert-badge-circle ${isRed ? 'alert-badge-red-circle' : 'alert-badge-yellow-circle'}" title="${escapeHtml(activeAlert.alert_message || '')}">
+                    <span class="dot-icon ${isRed ? 'red-dot' : 'yellow-dot'}"></span>
+                    <span class="alert-text-lbl">${isRed ? 'Red' : 'Yellow'}</span>
+                  </div>
+                  <button type="button" class="btn-alert-set" onclick="toggleInlineAlertEdit(${s.user_id}, true)">
+                    Set
+                  </button>
+                  <button type="button" class="btn-alert-clear-btn" onclick="clearStudentAlert(${s.user_id})">
+                    Clear
+                  </button>
+                </div>
+              `;
+            } else {
+              // State 1 (SS 1): No Alert Active (Clear text + Set button)
+              alertCellHtml = `
+                <div class="inline-alert-cell">
+                  <span class="alert-status-text alert-status-clear">Clear</span>
+                  <button type="button" class="btn-alert-set" onclick="toggleInlineAlertEdit(${s.user_id}, true)">
+                    Set
+                  </button>
+                </div>
+              `;
+            }
+
+            return `
               <tr>
                 <td>
                   <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(s.full_name)}</div>
@@ -780,14 +947,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td style="color: var(--text-main);">${escapeHtml(s.email)}</td>
                 <td style="font-family: var(--font-mono); color: var(--text-main);">${s.phone_number ? escapeHtml(s.phone_number) : '<span style="color: var(--text-muted);">N/A</span>'}</td>
                 <td>${attBadge}</td>
-                <td>
-                  <button class="btn btn-outline btn-sm" onclick="openAlertModalForUser(${s.user_id})">
-                    <i class="fa-solid fa-circle-exclamation" style="color: var(--status-orange);"></i> Issue Alert
-                  </button>
-                </td>
+                <td style="vertical-align: middle;">${alertCellHtml}</td>
               </tr>
             `;
-    }).join('')}
+          }).join('')}
         </tbody>
       </table>
     `;

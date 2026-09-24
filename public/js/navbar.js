@@ -150,13 +150,26 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
 
-        notiList.innerHTML = res.data.map(n => `
-          <div class="noti-item ${n.is_read ? '' : 'unread'}" data-noti-id="${n.notification_id}" data-link="${n.link_url || ''}">
+        notiList.innerHTML = res.data.map(n => {
+          // Determine if this is an alert-type notification
+          const isAlert = (n.notification_type || '').toLowerCase() === 'alert';
+          const titleLower = (n.title || '').toLowerCase();
+          const isRedAlert = isAlert && titleLower.includes('red');
+          const isYellowAlert = isAlert && (titleLower.includes('yellow') || (!titleLower.includes('red') && isAlert));
+
+          let alertClass = '';
+          if (!n.is_read) {
+            if (isRedAlert) alertClass = ' noti-alert-red';
+            else if (isYellowAlert) alertClass = ' noti-alert-yellow';
+          }
+
+          return `
+          <div class="noti-item ${n.is_read ? '' : 'unread'}${alertClass}" data-noti-id="${n.notification_id}" data-link="${n.link_url || ''}">
             <div class="title">${n.title}</div>
-            <div>${n.message}</div>
+            <div class="noti-msg">${n.message}</div>
             <div class="time">${new Date(n.created_at).toLocaleString()}</div>
           </div>
-        `).join('');
+        `}).join('');
 
         notiList.querySelectorAll('.noti-item').forEach(item => {
           item.onclick = (e) => {
@@ -213,8 +226,139 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(() => {
       pollActiveLiveSessions();
     }, 15000);
+
+    // Classroom Alert Banner Poller (only active on classroom.html)
+    if (window.location.pathname.includes('classroom.html')) {
+      pollClassroomAlertBanner();
+      setInterval(() => {
+        if (getAuthToken()) pollClassroomAlertBanner();
+      }, 30000);
+    }
   }
 });
+
+// ===== Classroom Active Alert Banner =====
+// In-memory dismiss flag — resets every time the page loads (intended behaviour)
+let _alertBannerDismissed = false;
+let _activeAlertType = null; // 'red' | 'yellow' | null
+
+async function pollClassroomAlertBanner() {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const classroomId = urlParams.get('id');
+    if (!classroomId) return;
+
+    const res = await apiFetch(`/classrooms/${classroomId}/alerts`);
+    const alerts = res.data || [];
+
+    // Find the current user's active (unresolved) alert
+    let storedUser = null;
+    try {
+      const sj = localStorage.getItem('classsync_user');
+      if (sj && sj !== 'undefined') storedUser = JSON.parse(sj);
+    } catch (e) {}
+    const myUserId = storedUser?.user_id ? Number(storedUser.user_id) : null;
+
+    const myActiveAlert = alerts.find(a =>
+      Number(a.learner_id) === myUserId &&
+      !a.is_resolved
+    );
+
+    applyClassroomAlertBanner(myActiveAlert || null);
+  } catch (err) {
+    console.warn('[AlertBanner] Could not check classroom alerts:', err.message);
+  }
+}
+
+function applyClassroomAlertBanner(alert) {
+  ensureAlertBannerExists();
+
+  const banner = document.getElementById('classroom-alert-banner');
+  const navbar = document.querySelector('.navbar');
+  if (!banner) return;
+
+  if (!alert) {
+    // No active alert at all — hide banner, restore navbar fully
+    _alertBannerDismissed = false;
+    _activeAlertType = null;
+    banner.classList.remove('active', 'banner-red', 'banner-yellow');
+    if (navbar) navbar.classList.remove('alert-red-active', 'alert-yellow-active');
+    adjustClassroomLayoutHeight();
+    return;
+  }
+
+  const isRed = alert.alert_type === 'red';
+  _activeAlertType = isRed ? 'red' : 'yellow';
+
+  // Always keep the navbar coloured, regardless of dismiss state
+  if (navbar) {
+    navbar.classList.remove('alert-red-active', 'alert-yellow-active');
+    navbar.classList.add(isRed ? 'alert-red-active' : 'alert-yellow-active');
+  }
+
+  // If user already dismissed the banner this session, don't show it again
+  if (_alertBannerDismissed) {
+    banner.classList.remove('active', 'banner-red', 'banner-yellow');
+    adjustClassroomLayoutHeight();
+    return;
+  }
+
+  const msg = (typeof escapeHtml === 'function') ? escapeHtml(alert.alert_message || '') : (alert.alert_message || '');
+  const issuer = (typeof escapeHtml === 'function') ? escapeHtml(alert.instructor_name || 'Instructor') : (alert.instructor_name || 'Instructor');
+
+  banner.className = 'classroom-alert-banner active ' + (isRed ? 'banner-red' : 'banner-yellow');
+  banner.innerHTML = `
+    <span class="banner-icon">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </span>
+    <span class="banner-text">
+      <span class="banner-label">${isRed ? '🔴 Red Alert' : '🟡 Yellow Warning'} — Issued by ${issuer}</span>
+      <span class="banner-msg">${msg}</span>
+    </span>
+    <button class="banner-dismiss" onclick="dismissAlertBanner()" title="Hide this bar">Dismiss</button>
+  `;
+
+  requestAnimationFrame(() => adjustClassroomLayoutHeight());
+}
+
+function ensureAlertBannerExists() {
+  if (document.getElementById('classroom-alert-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'classroom-alert-banner';
+  banner.className = 'classroom-alert-banner';
+  const navContainer = document.getElementById('navbar-container');
+  if (navContainer && navContainer.nextSibling) {
+    navContainer.parentNode.insertBefore(banner, navContainer.nextSibling);
+  } else if (navContainer) {
+    navContainer.parentNode.appendChild(banner);
+  } else {
+    document.body.prepend(banner);
+  }
+}
+
+function dismissAlertBanner() {
+  // Mark as dismissed — banner stays gone for this page session
+  _alertBannerDismissed = true;
+
+  // Hide ONLY the banner bar, navbar colour stays
+  const banner = document.getElementById('classroom-alert-banner');
+  if (banner) banner.classList.remove('active', 'banner-red', 'banner-yellow');
+
+  adjustClassroomLayoutHeight();
+}
+
+function adjustClassroomLayoutHeight() {
+  const layout = document.querySelector('.classroom-layout');
+  if (!layout) return;
+  const navbarEl = document.querySelector('.navbar');
+  const bannerEl = document.getElementById('classroom-alert-banner');
+  const navH = navbarEl ? navbarEl.offsetHeight : 70;
+  const bannerH = (bannerEl && bannerEl.classList.contains('active')) ? bannerEl.offsetHeight : 0;
+  layout.style.height = `calc(100vh - ${navH + bannerH}px)`;
+}
 
 async function markNotiRead(id, linkUrl) {
   try {

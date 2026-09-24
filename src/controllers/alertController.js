@@ -22,9 +22,13 @@ const createLearnerAlert = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only instructors or TAs can issue alerts' });
     }
 
-    if (!learner_id || !['yellow', 'red'].includes(alert_type) || !alert_message) {
-      return res.status(400).json({ success: false, message: 'learner_id, alert_type (yellow/red), and alert_message are required' });
+    if (!learner_id || !['yellow', 'red'].includes(alert_type)) {
+      return res.status(400).json({ success: false, message: 'learner_id and alert_type (yellow/red) are required' });
     }
+
+    const finalMessage = (alert_message && alert_message.trim())
+      ? alert_message.trim()
+      : (alert_type === 'red' ? 'Red Warning Alert' : 'Yellow Warning Alert');
 
     // Auto-resolve any existing active alerts for this learner in this classroom so new alert overwrites previous alerts
     await db.query(
@@ -37,7 +41,7 @@ const createLearnerAlert = async (req, res) => {
     const [result] = await db.query(
       `INSERT INTO learner_alerts (classroom_id, learner_id, instructor_id, alert_type, alert_message)
        VALUES (?, ?, ?, ?, ?)`,
-      [classroomId, learner_id, instructorId, alert_type, alert_message]
+      [classroomId, learner_id, instructorId, alert_type, finalMessage]
     );
 
     // Auto-create notification for learner
@@ -45,7 +49,7 @@ const createLearnerAlert = async (req, res) => {
       learner_id,
       'alert',
       `${alert_type.toUpperCase()} ALERT Warning Issued`,
-      `Instructor issued a ${alert_type} alert: ${alert_message}`,
+      `Instructor issued a ${alert_type} alert: ${finalMessage}`,
       `/classroom.html?id=${classroomId}`
     );
 
@@ -123,8 +127,58 @@ const resolveAlert = async (req, res) => {
   }
 };
 
+// PUT /api/classrooms/:id/learners/:learnerId/clear-alerts - Clear all active alerts for a learner
+const clearLearnerAlerts = async (req, res) => {
+  try {
+    const classroomId = req.params.id;
+    const learnerId = req.params.learnerId;
+    const userId = req.user.user_id;
+
+    if (!(await isInstructorOrTA(userId, classroomId))) {
+      return res.status(403).json({ success: false, message: 'Only instructors or TAs can clear alerts' });
+    }
+
+    await db.query(
+      `UPDATE learner_alerts
+       SET is_resolved = true, resolved_at = NOW(), resolved_by = ?
+       WHERE classroom_id = ? AND learner_id = ? AND (is_resolved = false OR is_resolved = 0)`,
+      [userId, classroomId, learnerId]
+    );
+
+    res.json({ success: true, message: 'Learner alerts cleared' });
+  } catch (error) {
+    console.error('Error clearing learner alerts:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/me/alerts - All active alerts for the current learner (across all classrooms)
+const getMyAlerts = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const [rows] = await db.query(
+      `SELECT la.alert_id, la.classroom_id, la.alert_type, la.alert_message,
+              la.is_resolved, la.created_at,
+              inst.full_name AS instructor_name,
+              c.classroom_name
+       FROM learner_alerts la
+       JOIN users inst ON la.instructor_id = inst.user_id
+       JOIN classrooms c ON la.classroom_id = c.classroom_id
+       WHERE la.learner_id = ? AND (la.is_resolved = false OR la.is_resolved = 0)
+       ORDER BY la.created_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching my alerts:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createLearnerAlert,
   getClassroomAlerts,
-  resolveAlert
+  resolveAlert,
+  clearLearnerAlerts,
+  getMyAlerts
 };

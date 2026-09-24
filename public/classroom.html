@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Classroom Dashboard - ClassSync</title>
-  <meta name="description" content="Access classroom homework sets, submission matrix, live sessions, problem bank, and member rosters.">
+  <meta name="description" content="Access classroom homework sets, submission matrix, live sessions, and member rosters.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -32,9 +32,6 @@
         </button>
         <button class="sidebar-item" data-tab="tab-resources">
           <i class="fa-solid fa-link"></i> <span>Resources</span>
-        </button>
-        <button class="sidebar-item" data-tab="tab-alerts">
-          <i class="fa-solid fa-triangle-exclamation"></i> <span>Learner Alerts</span>
         </button>
         <button class="sidebar-item" data-tab="tab-live">
           <i class="fa-solid fa-video"></i> <span>Live Sessions</span>
@@ -73,9 +70,6 @@
           <p class="card-subtitle" id="classroom-subtitle" style="margin: 0.35rem 0 0 0;">Loading classroom information...</p>
         </div>
         <div style="display: flex; gap: 0.75rem;" id="header-actions">
-          <a href="/problems.html" id="prob-bank-link" class="btn btn-outline btn-sm">
-            <i class="fa-solid fa-folder-closed"></i> Problem Bank
-          </a>
           <a href="/leaderboard.html" id="leaderboard-link" class="btn btn-outline btn-sm">
             <i class="fa-solid fa-trophy" style="color: var(--status-orange);"></i> Leaderboard
           </a>
