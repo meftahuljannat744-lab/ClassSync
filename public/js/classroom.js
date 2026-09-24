@@ -23,6 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById(item.dataset.tab).classList.add('active');
 
       const tabName = item.dataset.tab;
+      const cleanTab = tabName.replace('tab-', '');
+      try {
+        localStorage.setItem(`activeTab_${classroomId}`, cleanTab);
+        window.history.replaceState(null, '', `classroom.html?id=${classroomId}#${cleanTab}`);
+      } catch (e) {}
+
+      if (tabName === 'tab-homework') loadHomeworkTab();
       if (tabName === 'tab-matrix') loadMatrixTab();
       if (tabName === 'tab-health') loadHealthTab();
       if (tabName === 'tab-members') loadMembersTab();
@@ -62,10 +69,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.staff-only').forEach(el => el.style.display = isStaff ? 'inline-flex' : 'none');
       document.querySelectorAll('.staff-tab').forEach(el => el.style.display = isStaff ? 'flex' : 'none');
 
-      // Auto-select tab if specified in URL query parameter (e.g. classroom.html?id=4&tab=requests)
-      const requestedTabParam = urlParams.get('tab');
-      if (requestedTabParam) {
-        const targetBtn = document.querySelector(`.sidebar-item[data-tab="tab-${requestedTabParam}"]`);
+      // Auto-select tab if specified in URL Hash, query parameter, or localStorage
+      const hashTab = window.location.hash ? window.location.hash.replace('#', '').replace('tab-', '') : null;
+      const queryTab = urlParams.get('tab') ? urlParams.get('tab').replace('tab-', '') : null;
+      const storedTab = localStorage.getItem(`activeTab_${classroomId}`);
+
+      const activeTabName = hashTab || queryTab || storedTab;
+      if (activeTabName) {
+        const targetBtn = document.querySelector(`.sidebar-item[data-tab="tab-${activeTabName}"]`);
         if (targetBtn && targetBtn.style.display !== 'none') {
           targetBtn.click();
           return;
