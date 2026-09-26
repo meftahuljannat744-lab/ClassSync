@@ -868,6 +868,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   // TAB 8: Plagiarism Scan
+  let showHighRiskOnly = false;
+
   const loadPlagiarismTab = async () => {
     const container = document.getElementById('plagiarism-flags-list');
     const matrixSelect = document.getElementById('matrix-hw-select');
@@ -900,12 +902,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const res = await apiFetch(`/classrooms/${classroomId}/plagiarism-flags?homework_id=${encodeURIComponent(homeworkSelect.value)}`);
       const flags = res.data;
+      const visibleFlags = showHighRiskOnly
+        ? flags.filter(flag => Number(flag.similarity_score || 0) > 75)
+        : flags;
+      const highRiskFilterBtn = document.getElementById('high-risk-plagiarism-btn');
 
-      if (flags.length === 0) {
+      if (highRiskFilterBtn) {
+        highRiskFilterBtn.innerHTML = showHighRiskOnly
+          ? '<i class="fa-solid fa-list"></i> Show All Results'
+          : '<i class="fa-solid fa-triangle-exclamation"></i> Show High Risk Only';
+      }
+
+      if (visibleFlags.length === 0) {
         container.innerHTML = renderEmptyState({
-          icon: 'magnifying-glass-chart',
-          title: 'No Plagiarism Flags Detected',
-          message: 'Run a code hash similarity scan across learner submissions to detect potential plagiarism.'
+          icon: showHighRiskOnly ? 'triangle-exclamation' : 'magnifying-glass-chart',
+          title: showHighRiskOnly ? 'No High-Risk Matches Found' : 'No Plagiarism Flags Detected',
+          message: showHighRiskOnly
+            ? 'No similarity matches above 75% were found for this homework set.'
+            : 'Run a code hash similarity scan across learner submissions to detect potential plagiarism.'
         });
         return;
       }
@@ -923,7 +937,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </tr>
           </thead>
           <tbody>
-            ${flags.map(f => {
+            ${visibleFlags.map(f => {
               const score = Number(f.similarity_score || 0);
               const isHighRisk = score > 75;
               const isMediumRisk = score >= 25 && score <= 75;
@@ -967,6 +981,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const plagiarismSelect = document.getElementById('plagiarism-hw-select');
   const sharedHomeworkSelect = document.getElementById('matrix-hw-select');
+  const highRiskFilterBtn = document.getElementById('high-risk-plagiarism-btn');
+  if (highRiskFilterBtn) {
+    highRiskFilterBtn.onclick = () => {
+      showHighRiskOnly = !showHighRiskOnly;
+      loadPlagiarismTab();
+    };
+  }
   if (plagiarismSelect) {
     plagiarismSelect.onchange = () => {
       if (sharedHomeworkSelect) sharedHomeworkSelect.value = plagiarismSelect.value;
